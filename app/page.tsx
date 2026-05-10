@@ -322,7 +322,7 @@ export default function ControleDiariaApp() {
         <div className="flex-1 overflow-y-auto bg-slate-50 py-10 px-4">
           <div className="max-w-md mx-auto bg-white rounded-[32px] shadow-sm border border-slate-200 p-8">
             <div className="mb-8">
-              <button onClick={() => setView('welcome')} className="text-slate-400 hover:text-slate-800 mb-6 transition-colors p-2 -ml-2 rounded-xl hover:bg-slate-50">
+              <button onClick={() => setView(userProfile.name ? 'calendar' : 'welcome')} className="text-slate-400 hover:text-slate-800 mb-6 transition-colors p-2 -ml-2 rounded-xl hover:bg-slate-50">
                 <ChevronLeft className="w-6 h-6" />
               </button>
               <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight">Criar Perfil</h2>
@@ -813,15 +813,18 @@ export default function ControleDiariaApp() {
       {/* SIDEBAR DRAWER */}
       <AnimatePresence>
         {isSidebarOpen && (
-          <>
             <motion.div 
+              key="overlay"
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.4 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
               className="fixed inset-0 bg-slate-900 z-40"
             />
+        )}
+        {isSidebarOpen && (
             <motion.div
+              key="drawer"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
@@ -892,7 +895,6 @@ export default function ControleDiariaApp() {
                 </button>
               </div>
             </motion.div>
-          </>
         )}
       </AnimatePresence>
 
