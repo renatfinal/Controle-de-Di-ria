@@ -11,7 +11,7 @@ export async function fetchProfile(userId: string) {
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -19,8 +19,8 @@ export async function fetchProfile(userId: string) {
 export async function saveProfile(userId: string, profile: any) {
   const { data, error } = await supabase
     .from('profiles')
-    .update(profile)
-    .eq('id', userId);
+    .upsert({ id: userId, ...profile })
+    .select();
   if (error) throw error;
   return data;
 }

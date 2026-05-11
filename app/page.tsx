@@ -253,12 +253,17 @@ export default function ControleDiariaApp() {
     }
     
     if (authData.user) {
-       await saveProfile(authData.user.id, {
-         name: userProfile.name,
-         last_name: userProfile.lastName,
-         phone: userProfile.phone,
-         photo_url: userProfile.photoUrl
-       }).catch(console.error); // Catch RLS errors if not configured yet
+       try {
+         await saveProfile(authData.user.id, {
+           name: userProfile.name,
+           last_name: userProfile.lastName,
+           email: userProfile.email,
+           phone: userProfile.phone,
+           photo_url: userProfile.photoUrl
+         });
+       } catch (err: any) {
+         console.error('Falha ao salvar perfil:', err);
+       }
     }
     alert('Cadastrado com sucesso! Faça login.');
     setView('login');
