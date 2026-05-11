@@ -17,10 +17,12 @@ import {
   getYear
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff, Search, Shield, Users, Unlock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabase';
+import { loadMonthlyRecords, saveDailyRecords, saveProfile, fetchProfile, fetchAllUsers, toggleBlockUser, deleteUserProfile } from '../lib/api';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -41,25 +43,100 @@ const INITIAL_RECORDS: Record<string, DailyEntry[]> = {
 };
 
 export default function ControleDiariaApp() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 4, 9)); // May 9, 2026
-  const [displayedMonth, setDisplayedMonth] = useState(startOfMonth(new Date(2026, 4, 9)));
+  const [currentDate, setCurrentDate] = useState(new Date()); // Today
+  const [displayedMonth, setDisplayedMonth] = useState(startOfMonth(new Date()));
   const [records, setRecords] = useState<Record<string, DailyEntry[]>>(INITIAL_RECORDS);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [view, setView] = useState<'welcome' | 'register' | 'login' | 'calendar' | 'annual-balance' | 'blank'>('welcome');
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [view, setView] = useState<'welcome' | 'register' | 'login' | 'calendar' | 'annual-balance' | 'blank' | 'admin'>('welcome');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
   const [isSaved, setIsSaved] = useState(false);
   const [userProfile, setUserProfile] = useState({
     name: '',
     lastName: '',
     email: '',
     phone: '',
-    photoUrl: ''
+    photoUrl: '',
+    role: 'user'
   });
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setAuthUserId(session.user.id);
+        setView('calendar');
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setAuthUserId(session.user.id);
+      } else {
+        setAuthUserId(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load records from Supabase
+  useEffect(() => {
+    if (authUserId) {
+      const year = getYear(displayedMonth);
+      const month = displayedMonth.getMonth() + 1;
+      loadMonthlyRecords(authUserId, year, month)
+        .then((dbRecords) => {
+          // Merge local with DB, db takes precedence
+          setRecords(prev => ({ ...prev, ...dbRecords }));
+        })
+        .catch(console.error);
+    }
+  }, [authUserId, displayedMonth]);
+
+  useEffect(() => {
+    if (authUserId) {
+      fetchProfile(authUserId).then(profile => {
+        if (profile) {
+          setUserProfile({
+            name: profile.name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || '',
+            phone: profile.phone || '',
+            photoUrl: profile.photo_url || '',
+            role: profile.role || 'user'
+          });
+        }
+      }).catch(console.warn);
+    }
+  }, [authUserId]);
+
+  useEffect(() => {
+    if (view === 'admin' && userProfile.role === 'admin') {
+      fetchAllUsers().then(setAllUsers).catch(console.error);
+    }
+  }, [view, userProfile.role]);
+
+  const toggleBlock = async (id: string, isBlocked: boolean) => {
+    await toggleBlockUser(id, !isBlocked);
+    setAllUsers(prev => prev.map(u => u.id === id ? { ...u, is_blocked: !isBlocked } : u));
+  };
+
+  const deleteUser = async (id: string) => {
+    if (confirm('Tem certeza que deseja excluir este usuário e todos os seus registros?')) {
+      await deleteUserProfile(id);
+      setAllUsers(prev => prev.filter(u => u.id !== id));
+    }
+  };
 
   const formatPhone = (value: string) => {
     let v = value.replace(/\D/g, '');
@@ -83,15 +160,108 @@ export default function ControleDiariaApp() {
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setLoginError('');
-    // If no user has registered yet, let's just make it required to match what's set (even if empty, they shouldn't just enter anything).
-    // Or we can just do a strict match:
-    if (loginEmail !== userProfile.email || loginPassword !== registerPassword || (!userProfile.email && loginEmail !== '')) {
-      setLoginError('Usuário ou senha incorreta');
+    if (!loginEmail || !loginPassword) {
+      setLoginError('Preencha os dados.');
       return;
     }
-    setView('calendar');
+    
+    // Attempt Supabase login
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword
+    });
+
+    if (error) {
+      // Local fallback for demo purposes if Supabase is not provided
+      if (loginEmail === userProfile.email && loginPassword === registerPassword && userProfile.email) {
+        setView('calendar');
+        return;
+      }
+      console.error(error);
+      setLoginError('Usuário ou senha incorreta (Supabase não conectado ou credencial inválida)');
+      return;
+    }
+
+    if (authData.user) {
+      setAuthUserId(authData.user.id);
+      setView('calendar');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setResetMessage('');
+    setLoginError('');
+    if (!loginEmail) {
+      setLoginError('Digite seu email primeiro para recuperar a senha.');
+      return;
+    }
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+      redirectTo: window.location.origin,
+    });
+    
+    if (error) {
+      setLoginError('Erro ao solicitar recuperação de senha: ' + error.message);
+    } else {
+      setResetMessage('Um link de recuperação de senha foi enviado para seu email.');
+    }
+  };
+
+  const handleRegister = async () => {
+    if (authUserId) {
+      // Update existing user profile
+      const updates = {
+         name: userProfile.name,
+         last_name: userProfile.lastName,
+         phone: userProfile.phone,
+         photo_url: userProfile.photoUrl
+      };
+      await saveProfile(authUserId, updates).catch(console.error);
+      
+      // Update password if provided
+      if (registerPassword) {
+        if (registerPassword.length < 6) {
+          alert('A nova senha deve ter no mínimo 6 caracteres.');
+          return;
+        }
+        const { error } = await supabase.auth.updateUser({ password: registerPassword });
+        if (error) {
+          alert('Erro ao atualizar a senha: ' + error.message);
+          return;
+        }
+        setRegisterPassword('');
+      }
+      
+      alert('Perfil atualizado com sucesso!');
+      setView('calendar');
+      return;
+    }
+
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: userProfile.email,
+      password: registerPassword
+    });
+
+    if (error) {
+      console.error(error);
+      alert('Erro no cadastro Supabase: ' + error.message);
+      // Local fallback
+      setView('login');
+      return;
+    }
+    
+    if (authData.user) {
+       await saveProfile(authData.user.id, {
+         name: userProfile.name,
+         last_name: userProfile.lastName,
+         phone: userProfile.phone,
+         photo_url: userProfile.photoUrl
+       }).catch(console.error); // Catch RLS errors if not configured yet
+    }
+    alert('Cadastrado com sucesso! Faça login.');
+    setView('login');
   };
 
   const dateKey = format(currentDate, 'yyyy-MM-dd');
@@ -196,12 +366,20 @@ export default function ControleDiariaApp() {
     setRecords(prev => ({ ...prev, [dateKey]: updated }));
   };
 
-  const saveDay = () => {
+  const saveDay = async () => {
     setRecords(prev => ({
       ...prev,
       [dateKey]: formEntries
     }));
     
+    if (authUserId) {
+      try {
+        await saveDailyRecords(authUserId, dateKey, formEntries);
+      } catch (err) {
+        console.error('Failed to save to Supabase', err);
+      }
+    }
+
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
@@ -228,11 +406,21 @@ export default function ControleDiariaApp() {
     return total;
   }, [records, displayedMonth]);
 
-  const hasData = (date: Date) => {
+  const getDataStatus = (date: Date) => {
     const key = format(date, 'yyyy-MM-dd');
-    if (!records[key]) return false;
-    // Consider it has data if any entry has a value
-    return records[key].some(e => parseCurrency(e.value) > 0);
+    if (!records[key]) return 'none';
+    
+    const activeEntries = records[key].filter(e => parseCurrency(e.value) > 0);
+    if (activeEntries.length === 0) return 'none';
+    
+    const hasAlmoco = activeEntries.some(e => e.label.toLowerCase().includes('almo'));
+    const hasJanta = activeEntries.some(e => e.label.toLowerCase().includes('jant'));
+    
+    if ((hasAlmoco && !hasJanta) || (!hasAlmoco && hasJanta)) {
+      return 'partial'; // Red dot
+    }
+    
+    return 'full'; // Standard purple dot
   };
 
   const monthsList = useMemo(() => [
@@ -325,8 +513,8 @@ export default function ControleDiariaApp() {
               <button onClick={() => setView(userProfile.name ? 'calendar' : 'welcome')} className="text-slate-400 hover:text-slate-800 mb-6 transition-colors p-2 -ml-2 rounded-xl hover:bg-slate-50">
                 <ChevronLeft className="w-6 h-6" />
               </button>
-              <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight">Criar Perfil</h2>
-              <p className="text-slate-500 mt-1 font-medium">Configure suas informações pessoais</p>
+              <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight">{authUserId ? 'Meu Perfil' : 'Criar Perfil'}</h2>
+              <p className="text-slate-500 mt-1 font-medium">{authUserId ? 'Atualize suas informações pessoais ou senha' : 'Configure suas informações pessoais'}</p>
             </div>
 
             <div className="flex flex-col items-center mb-10">
@@ -400,7 +588,7 @@ export default function ControleDiariaApp() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Senha</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">{authUserId ? 'Nova Senha (Opcional)' : 'Senha'}</label>
                  <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input 
@@ -408,6 +596,7 @@ export default function ControleDiariaApp() {
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-12 py-3.5 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-shadow font-medium"
+                    placeholder={authUserId ? 'Deixe em branco para não alterar' : 'Senha'}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -422,6 +611,7 @@ export default function ControleDiariaApp() {
                   <input 
                     type={showConfirmPassword ? "text" : "password"} 
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-12 py-3.5 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-shadow font-medium"
+                    placeholder={authUserId ? 'Confirme se for alterar a senha' : ''}
                   />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -431,10 +621,10 @@ export default function ControleDiariaApp() {
             </div>
 
             <button 
-              onClick={() => setView('login')}
+              onClick={handleRegister}
               className="w-full mt-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-colors shadow-lg shadow-indigo-600/30 active:scale-95 text-lg"
             >
-              Cadastrar
+              {authUserId ? 'Salvar Alterações' : 'Cadastrar'}
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
@@ -468,7 +658,10 @@ export default function ControleDiariaApp() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Senha</label>
+                <div className="flex justify-between items-center pl-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Senha</label>
+                  <button type="button" onClick={handleResetPassword} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">Esqueceu a senha?</button>
+                </div>
                  <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input 
@@ -490,6 +683,12 @@ export default function ControleDiariaApp() {
                 {loginError}
               </div>
             )}
+            
+            {resetMessage && (
+              <div className="mt-6 p-4 bg-emerald-50 text-emerald-700 rounded-xl text-center font-bold text-sm border border-emerald-100">
+                {resetMessage}
+              </div>
+            )}
 
             <button 
               onClick={handleLogin}
@@ -502,7 +701,7 @@ export default function ControleDiariaApp() {
         </div>
       )}
 
-      {(view === 'calendar' || view === 'annual-balance' || view === 'blank') && (
+      {(view === 'calendar' || view === 'annual-balance' || view === 'blank' || view === 'admin') && (
         <>
           {/* HEADER */}
           <header className="bg-white border-b border-slate-200 px-6 lg:px-10 py-4 lg:h-24 flex items-center gap-4 shrink-0 overflow-x-auto">
@@ -534,6 +733,15 @@ export default function ControleDiariaApp() {
             >
               <AlignLeft className="w-6 h-6" />
             </button>
+            {userProfile.role === 'admin' && (
+              <button 
+                onClick={() => setView('admin')}
+                className="w-14 h-14 bg-slate-900 border border-slate-900 text-indigo-400 rounded-2xl flex items-center justify-center hover:bg-slate-800 shadow-sm shrink-0 transition-colors ml-auto mr-0 lg:ml-4 lg:mr-0"
+                title="Painel Administrativo"
+              >
+                <Shield className="w-6 h-6" />
+              </button>
+            )}
             
             <div className="flex-1 flex justify-end items-center hidden lg:flex">
               {view === 'calendar' && (
@@ -575,7 +783,9 @@ export default function ControleDiariaApp() {
               {calendarDays.map((day, i) => {
                 const isCurrentMonth = isSameMonth(day, displayedMonth);
                 const isSelected = isSameDay(day, currentDate);
-                const hasRecords = hasData(day);
+                const dataStatus = getDataStatus(day);
+                const hasRecords = dataStatus !== 'none';
+                const isPartial = dataStatus === 'partial';
 
                 return (
                   <div key={i} className="flex justify-center items-center">
@@ -592,16 +802,17 @@ export default function ControleDiariaApp() {
                         "relative w-full aspect-square max-w-[3rem] lg:max-w-none lg:w-16 lg:h-16 flex flex-col items-center justify-center rounded-2xl font-bold text-lg lg:text-xl transition-all",
                         !isCurrentMonth && "text-slate-300 font-medium",
                         isCurrentMonth && !isSelected && !hasRecords && "bg-slate-50 text-slate-800 hover:bg-slate-100",
-                        hasRecords && !isSelected && "bg-indigo-50 text-indigo-600 border border-indigo-100",
+                        hasRecords && !isSelected && !isPartial && "bg-indigo-50 text-indigo-600 border border-indigo-100",
+                        hasRecords && !isSelected && isPartial && "bg-red-50 text-red-600 border border-red-100",
                         isSelected && "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
                       )}
                     >
                       <span>{format(day, 'd')}</span>
                       {hasRecords && !isSelected && (
-                        <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                        <span className={cn("absolute bottom-1 w-1.5 h-1.5 rounded-full", isPartial ? "bg-red-500" : "bg-indigo-500")}></span>
                       )}
                       {isSelected && hasRecords && (
-                         <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-white"></span>
+                         <span className={cn("absolute bottom-1 w-1.5 h-1.5 rounded-full", isPartial ? "bg-red-300" : "bg-white")}></span>
                       )}
                     </button>
                   </div>
@@ -760,7 +971,7 @@ export default function ControleDiariaApp() {
                   <div className="flex-1 flex items-center justify-center border-r border-slate-100 text-indigo-600 font-semibold px-2">
                     {month.col2 > 0 ? formatCurrency(month.col2) : '0,00'}
                   </div>
-                  <div className="flex-1 flex items-center justify-center text-emerald-600 font-bold px-2 bg-emerald-50/40">
+                  <div className="flex-1 flex items-center justify-center text-indigo-600 font-bold px-2 bg-indigo-50/40">
                     {month.totalMonth > 0 ? formatCurrency(month.totalMonth) : '0,00'}
                   </div>
                 </div>
@@ -776,7 +987,7 @@ export default function ControleDiariaApp() {
                  <div className="text-slate-400 text-xs font-bold tracking-widest uppercase mb-1 flex items-center gap-1 justify-end">
                   Balancete Anual
                  </div>
-                 <div className="text-2xl lg:text-3xl font-bold text-emerald-400">
+                 <div className="text-2xl lg:text-3xl font-bold text-indigo-400">
                    R$ {formatCurrency(annualData.totalAnual)}
                  </div>
                </div>
@@ -803,6 +1014,153 @@ export default function ControleDiariaApp() {
               >
                 Voltar para Calendário
               </button>
+            </div>
+          </div>
+        ) : view === 'admin' ? (
+          <div className="max-w-5xl mx-auto w-full flex flex-col p-4 lg:p-8 pb-24 h-full overflow-y-auto">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-800 mb-1">Painel Administrativo</h2>
+                <p className="text-slate-500">Gestão ativa dos clientes e usuários do sistema.</p>
+              </div>
+              <div className="relative max-w-sm w-full md:w-auto">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou email..."
+                  value={adminSearchQuery}
+                  onChange={(e) => setAdminSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                 <div>
+                   <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Total de Clientes</p>
+                   <p className="text-3xl font-bold text-slate-800">{allUsers.length}</p>
+                 </div>
+                 <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+                   <Users className="w-6 h-6" />
+                 </div>
+              </div>
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                 <div>
+                   <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Ativos</p>
+                   <p className="text-3xl font-bold text-emerald-600">{allUsers.filter(u => !u.is_blocked).length}</p>
+                 </div>
+                 <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                   <Shield className="w-6 h-6" />
+                 </div>
+              </div>
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                 <div>
+                   <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Bloqueados</p>
+                   <p className="text-3xl font-bold text-red-600">{allUsers.filter(u => u.is_blocked).length}</p>
+                 </div>
+                 <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600">
+                   <Lock className="w-6 h-6" />
+                 </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-sm">
+                      <th className="p-4 pl-6 uppercase tracking-wider text-xs">Cliente</th>
+                      <th className="p-4 uppercase tracking-wider text-xs">Contato</th>
+                      <th className="p-4 uppercase tracking-wider text-xs w-32 text-center">Status</th>
+                      <th className="p-4 uppercase tracking-wider text-xs w-40 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center text-slate-500">
+                          Nenhum usuário encontrado ou carregando...
+                        </td>
+                      </tr>
+                    )}
+                    {allUsers
+                      .filter(u => 
+                         (u.name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
+                         (u.last_name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
+                         (u.email?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase())
+                      )
+                      .map((u) => (
+                      <tr key={u.id} className="border-b border-slate-100/50 hover:bg-slate-50/50 transition-colors">
+                        <td className="p-4 pl-6">
+                           <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0 border border-indigo-200">
+                               {u.photo_url ? (
+                                  <img src={u.photo_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                               ) : (
+                                  `${(u.name?.[0] || u.email[0]).toUpperCase()}`
+                               )}
+                             </div>
+                             <div>
+                               <div className="font-bold text-slate-800 flex items-center gap-2">
+                                 {u.name || 'Sem nome'} {u.last_name || ''}
+                                 {u.role === 'admin' && <span className="text-[10px] bg-slate-800 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Admin</span>}
+                               </div>
+                               <div className="text-xs text-slate-400 mt-0.5">Cadastrado em {u.created_at ? format(new Date(u.created_at), 'dd/MM/yyyy') : 'N/A'}</div>
+                             </div>
+                           </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-slate-700 font-medium">{u.email}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{u.phone || 'Sem telefone'}</div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={cn(
+                            "text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider",
+                            u.is_blocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+                          )}>
+                            {u.is_blocked ? 'Bloqueado' : 'Ativo'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center space-x-2">
+                           {userProfile.email !== u.email && (
+                             <div className="flex items-center justify-center gap-2">
+                              <button 
+                                onClick={() => toggleBlock(u.id, u.is_blocked)} 
+                                className={cn(
+                                  "w-9 h-9 rounded-xl flex items-center justify-center transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500",
+                                  u.is_blocked ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200" : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
+                                )}
+                                title={u.is_blocked ? 'Desbloquear Acesso' : 'Bloquear Acesso'}
+                              >
+                                {u.is_blocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                              </button>
+                              <button 
+                                onClick={() => deleteUser(u.id)}
+                                className="w-9 h-9 bg-white border border-red-200 text-red-600 rounded-xl flex items-center justify-center hover:bg-red-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
+                                title="Excluir Definitivamente"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                             </div>
+                           )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="mt-8 flex justify-center pb-8 shrink-0">
+               <button 
+                 onClick={() => setView('calendar')} 
+                 className="bg-white text-slate-700 border border-slate-200 font-semibold py-3 px-8 rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
+               >
+                 Voltar ao Resumo
+               </button>
             </div>
           </div>
         ) : null}
@@ -882,7 +1240,7 @@ export default function ControleDiariaApp() {
                 })}
               </div>
 
-              <div className="p-6 border-t border-slate-100 bg-slate-50 mt-auto">
+              <div className="p-6 border-t border-slate-100 bg-slate-50 mt-auto space-y-3">
                  <button 
                   onClick={() => {
                     setView('annual-balance');
@@ -893,6 +1251,30 @@ export default function ControleDiariaApp() {
                   <FileText className="w-5 h-5 text-indigo-300 group-hover:scale-110 transition-transform" />
                   <span className="tracking-wide">Balancete Anual</span>
                 </button>
+                 {userProfile.role === 'admin' && (
+                    <button 
+                      onClick={() => {
+                        setView('admin');
+                        setIsSidebarOpen(false);
+                      }}
+                      className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm"
+                    >
+                      <User className="w-5 h-5" />
+                      <span>Painel Admin</span>
+                    </button>
+                 )}
+                 {authUserId && (
+                   <button 
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      setView('welcome');
+                      setIsSidebarOpen(false);
+                    }}
+                    className="w-full bg-white hover:bg-red-50 text-red-600 border border-slate-200 hover:border-red-200 active:scale-95 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm"
+                   >
+                     Sair (Logout)
+                   </button>
+                 )}
               </div>
             </motion.div>
         )}
