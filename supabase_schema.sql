@@ -24,18 +24,18 @@ drop policy if exists "Admins podem alterar todos." on profiles;
 
 create policy "Usuários podem ver seus próprios perfis."
   on profiles for select
-  using ( auth.uid() = id or (select role from profiles where id = auth.uid()) = 'admin' );
+  using ( auth.uid() = id or auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 create policy "Usuários podem atualizar seus próprios perfis."
   on profiles for update
-  using ( auth.uid() = id or (select role from profiles where id = auth.uid()) = 'admin' );
+  using ( auth.uid() = id or auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 create policy "Usuários podem inserir seus próprios perfis."
   on profiles for insert
   with check ( auth.uid() = id );
 
 create policy "Admins podem alterar todos." on profiles
-  for delete using ( (select role from profiles where id = auth.uid()) = 'admin' );
+  for delete using ( auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 -- 2. Tabela para Registros Diários (daily_entries)
 create table if not exists public.daily_entries (
@@ -57,19 +57,19 @@ drop policy if exists "Usuários podem deletar seus registros." on daily_entries
 
 create policy "Usuários podem inserir seus registros."
   on daily_entries for insert
-  with check ( auth.uid() = user_id or (select role from profiles where id = auth.uid()) = 'admin' );
+  with check ( auth.uid() = user_id or auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 create policy "Usuários podem ver seus próprios registros."
   on daily_entries for select
-  using ( auth.uid() = user_id or (select role from profiles where id = auth.uid()) = 'admin' );
+  using ( auth.uid() = user_id or auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 create policy "Usuários podem atualizar seus registros."
   on daily_entries for update
-  using ( auth.uid() = user_id or (select role from profiles where id = auth.uid()) = 'admin' );
+  using ( auth.uid() = user_id or auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 create policy "Usuários podem deletar seus registros."
   on daily_entries for delete
-  using ( auth.uid() = user_id or (select role from profiles where id = auth.uid()) = 'admin' );
+  using ( auth.uid() = user_id or auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 -- 3. Gatilho (Trigger) para criar automaticamente um perfil quando um novo usuário se cadastrar usando o Supabase Auth
 create or replace function public.handle_new_user()
@@ -118,13 +118,13 @@ create policy "Todos podem ver os slides."
 -- Apenas o e-mail do admin pode inserir, atualizar e deletar
 create policy "Apenas admin pode criar slides."
   on global_slides for insert
-  with check ( (select email from profiles where id = auth.uid()) = 'renatof.rcc@gmail.com' );
+  with check ( auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 create policy "Apenas admin pode modificar os slides."
   on global_slides for update
-  using ( (select email from profiles where id = auth.uid()) = 'renatof.rcc@gmail.com' );
+  using ( auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
 create policy "Apenas admin pode deletar slides."
   on global_slides for delete
-  using ( (select email from profiles where id = auth.uid()) = 'renatof.rcc@gmail.com' );
+  using ( auth.jwt()->>'email' = 'renatof.rcc@gmail.com' );
 
