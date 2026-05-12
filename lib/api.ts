@@ -82,7 +82,11 @@ export async function saveDailyRecords(userId: string, dateKey: string, entries:
     .eq('date_key', dateKey);
 
   // Then insert new if there are any that have values
-  const validEntries = entries.filter(e => e.label && e.value && e.value !== '0,00' && parseFloat(e.value) > 0);
+  const validEntries = entries.filter(e => {
+    if (!e.label || !e.value || e.value === '0,00') return false;
+    const parsed = parseFloat(e.value.replace(/\./g, '').replace(',', '.'));
+    return !isNaN(parsed) && parsed > 0;
+  });
   
   if (validEntries.length > 0) {
     const rows = validEntries.map(e => ({
