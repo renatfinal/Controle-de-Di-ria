@@ -19,6 +19,7 @@ alter table public.profiles enable row level security;
 -- Remove políticas antigas (se existirem) para evitar erro de duplicidade
 drop policy if exists "Usuários podem ver seus próprios perfis." on profiles;
 drop policy if exists "Usuários podem atualizar seus próprios perfis." on profiles;
+drop policy if exists "Usuários podem inserir seus próprios perfis." on profiles;
 drop policy if exists "Admins podem alterar todos." on profiles;
 
 create policy "Usuários podem ver seus próprios perfis."
@@ -28,6 +29,10 @@ create policy "Usuários podem ver seus próprios perfis."
 create policy "Usuários podem atualizar seus próprios perfis."
   on profiles for update
   using ( auth.uid() = id or (select role from profiles where id = auth.uid()) = 'admin' );
+
+create policy "Usuários podem inserir seus próprios perfis."
+  on profiles for insert
+  with check ( auth.uid() = id );
 
 create policy "Admins podem alterar todos." on profiles
   for delete using ( (select role from profiles where id = auth.uid()) = 'admin' );

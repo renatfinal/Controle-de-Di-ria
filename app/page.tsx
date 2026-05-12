@@ -142,18 +142,25 @@ export default function ControleDiariaApp() {
 
   useEffect(() => {
     if (authUserId) {
-      fetchProfile(authUserId).then(profile => {
-        if (profile) {
-          setUserProfile({
-            name: profile.name || '',
-            lastName: profile.last_name || '',
-            email: profile.email || '',
-            phone: profile.phone || '',
-            photoUrl: profile.photo_url || '',
-            role: profile.role || 'user'
-          });
-        }
-      }).catch(console.warn);
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        fetchProfile(authUserId).then(profile => {
+          if (profile) {
+            setUserProfile({
+              name: profile.name || '',
+              lastName: profile.last_name || '',
+              email: profile.email || user?.email || '',
+              phone: profile.phone || '',
+              photoUrl: profile.photo_url || '',
+              role: profile.role || 'user'
+            });
+          } else if (user) {
+            setUserProfile(prev => ({ ...prev, email: user.email || '' }));
+          }
+        }).catch(err => {
+          console.warn(err);
+          if (user) setUserProfile(prev => ({ ...prev, email: user.email || '' }));
+        });
+      });
     }
   }, [authUserId]);
 
@@ -362,7 +369,8 @@ export default function ControleDiariaApp() {
          name: userProfile.name,
          last_name: userProfile.lastName,
          phone: userProfile.phone,
-         photo_url: userProfile.photoUrl
+         photo_url: userProfile.photoUrl,
+         email: userProfile.email
       };
       await saveProfile(authUserId, updates).catch(console.error);
       
