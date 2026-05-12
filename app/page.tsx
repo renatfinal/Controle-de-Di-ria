@@ -17,7 +17,7 @@ import {
   getYear
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff, Search, Shield, Users, Unlock, Image as ImageIcon, Type, Play, Pause, Upload, Video, Bold, Italic, Type as TypeIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff, Search, Shield, Users, Unlock, Image as ImageIcon, Type, Play, Pause, Upload, Video, Bold, Italic, Type as TypeIcon, Menu, BarChart3 } from 'lucide-react';
 
 // ... Inside ControleDiariaApp ...
 
@@ -575,11 +575,11 @@ export default function ControleDiariaApp() {
     const hasAlmoco = activeEntries.some(e => e.label.toLowerCase().includes('almo'));
     const hasJanta = activeEntries.some(e => e.label.toLowerCase().includes('jant'));
     
-    if ((hasAlmoco && !hasJanta) || (!hasAlmoco && hasJanta)) {
-      return 'partial'; // Red dot
-    }
+    if (hasAlmoco && !hasJanta) return 'almoco';
+    if (!hasAlmoco && hasJanta) return 'janta';
+    if (hasAlmoco && hasJanta) return 'both';
     
-    return 'full'; // Standard purple dot
+    return 'other';
   };
 
   const monthsList = useMemo(() => [
@@ -786,6 +786,17 @@ export default function ControleDiariaApp() {
               {authUserId ? 'Salvar Alterações' : 'Cadastrar'}
               <ArrowRight className="w-5 h-5" />
             </button>
+            {authUserId && (
+               <button 
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setView('welcome');
+                }}
+                className="w-full mt-4 bg-white hover:bg-red-50 text-red-600 border border-slate-200 hover:border-red-200 active:scale-95 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm text-lg"
+               >
+                 Sair (Logout)
+               </button>
+            )}
           </div>
         </div>
       )}
@@ -860,62 +871,76 @@ export default function ControleDiariaApp() {
         </div>
       )}
 
-      {(view === 'calendar' || view === 'annual-balance' || view === 'blank' || view === 'admin') && (
-        <>
-          {/* HEADER */}
-          <header className="bg-white border-b border-slate-200 px-6 lg:px-10 py-4 lg:h-24 flex items-center gap-4 shrink-0 overflow-x-auto">
-            <button 
-              onClick={() => setView('register')}
-              className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-bold text-xl hover:bg-slate-800 shadow-sm shrink-0 transition-colors overflow-hidden relative"
-            >
-              {userProfile.photoUrl ? (
-                <img src={userProfile.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'RF'
-              )}
-            </button>
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="w-14 h-14 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center hover:bg-indigo-100 shadow-sm shrink-0 transition-colors"
-            >
-              <CalendarIcon className="w-6 h-6" />
-            </button>
-            <button 
-              onClick={() => setView('blank')}
-              className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
-              title="Slideshow"
-            >
-              <FileText className="w-6 h-6" />
-            </button>
-            <button 
-              onClick={() => setView('annual-balance')}
-              className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
-            >
-              <AlignLeft className="w-6 h-6" />
-            </button>
-            {userProfile.role === 'admin' && (
-              <button 
-                onClick={() => setView('admin')}
-                className="w-14 h-14 bg-slate-900 border border-slate-900 text-indigo-400 rounded-2xl flex items-center justify-center hover:bg-slate-800 shadow-sm shrink-0 transition-colors ml-auto mr-0 lg:ml-4 lg:mr-0"
-                title="Painel Administrativo"
-              >
-                <Shield className="w-6 h-6" />
-              </button>
+      {(authUserId && view !== 'welcome' && view !== 'login') && (
+        <header className="bg-white border-b border-slate-200 px-6 lg:px-10 py-4 lg:h-24 flex flex-shrink-0 items-center gap-4 overflow-x-auto z-[60] relative w-full shadow-sm">
+          <button 
+            onClick={() => setView('register')}
+            className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-bold text-xl hover:bg-slate-800 shadow-sm shrink-0 transition-colors overflow-hidden relative"
+          >
+            {userProfile.photoUrl ? (
+              <img src={userProfile.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'RF'
             )}
-            
-            <div className="flex-1 flex justify-end items-center hidden lg:flex">
-              {view === 'calendar' && (
-                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 ml-4 shrink-0">
-                  <CalendarIcon className="w-4 h-4 text-indigo-600" />
-                  <span className="text-slate-700 text-sm font-semibold tracking-wide uppercase">
-                    {format(currentDate, 'dd / MMM / yyyy', { locale: ptBR })}
-                  </span>
-                </div>
-              )}
-            </div>
-          </header>
+          </button>
+          <button 
+            onClick={() => setView('calendar')}
+            className="w-14 h-14 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex flex-col items-center justify-center hover:bg-indigo-100 shadow-sm shrink-0 transition-colors"
+            title="Calendário"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-widest leading-none mb-1">
+              {format(currentDate, 'MMM', { locale: ptBR })}
+            </span>
+            <span className="text-xl font-black leading-none">
+              {format(currentDate, 'dd')}
+            </span>
+          </button>
+          <button 
+            onClick={() => setView('blank')}
+            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
+            title="Slideshow"
+          >
+            <FileText className="w-6 h-6" />
+          </button>
+          <button 
+            onClick={() => setView('annual-balance')}
+            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
+          >
+            <BarChart3 className="w-6 h-6" />
+          </button>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
+            title="Menu de Meses"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          {userProfile.role === 'admin' && (
+            <button 
+              onClick={() => setView('admin')}
+              className="w-14 h-14 bg-slate-900 border border-slate-900 text-indigo-400 rounded-2xl flex items-center justify-center hover:bg-slate-800 shadow-sm shrink-0 transition-colors ml-auto mr-0 lg:ml-4 lg:mr-0"
+              title="Painel Administrativo"
+            >
+              <Shield className="w-6 h-6" />
+            </button>
+          )}
+          
+          <div className="flex-1 flex justify-end items-center hidden lg:flex">
+            {view === 'calendar' && (
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 ml-4 shrink-0">
+                <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                <span className="text-slate-700 text-sm font-semibold tracking-wide uppercase">
+                  {format(currentDate, 'dd / MMM / yyyy', { locale: ptBR })}
+                </span>
+              </div>
+            )}
+          </div>
+        </header>
+      )}
 
-      <main className="flex-1 overflow-y-auto min-h-0 bg-slate-50">
+      {(view === 'calendar' || view === 'annual-balance' || view === 'blank' || view === 'admin') && (
+        <div className="flex-1 flex flex-col min-h-0 relative">
+        <main className="flex-1 overflow-y-auto min-h-0 bg-slate-50 relative">
         {view === 'calendar' ? (
           <div className="max-w-xl lg:max-w-2xl mx-auto w-full flex flex-col gap-6 lg:gap-8 p-4 lg:p-8 pb-24">
             {/* CALENDAR CARD */}
@@ -945,7 +970,17 @@ export default function ControleDiariaApp() {
                 const isSelected = isSameDay(day, currentDate);
                 const dataStatus = getDataStatus(day);
                 const hasRecords = dataStatus !== 'none';
-                const isPartial = dataStatus === 'partial';
+
+                let dotColorNormal = "bg-indigo-500";
+                let dotColorSelected = "bg-white";
+                
+                if (dataStatus === 'almoco') {
+                  dotColorNormal = "bg-green-500";
+                  dotColorSelected = "bg-green-300";
+                } else if (dataStatus === 'janta') {
+                  dotColorNormal = "bg-red-500";
+                  dotColorSelected = "bg-red-300";
+                }
 
                 return (
                   <div key={i} className="flex justify-center items-center">
@@ -962,17 +997,16 @@ export default function ControleDiariaApp() {
                         "relative w-full aspect-square max-w-[3rem] lg:max-w-none lg:w-16 lg:h-16 flex flex-col items-center justify-center rounded-2xl font-bold text-lg lg:text-xl transition-all",
                         !isCurrentMonth && "text-slate-300 font-medium",
                         isCurrentMonth && !isSelected && !hasRecords && "bg-slate-50 text-slate-800 hover:bg-slate-100",
-                        hasRecords && !isSelected && !isPartial && "bg-indigo-50 text-indigo-600 border border-indigo-100",
-                        hasRecords && !isSelected && isPartial && "bg-red-50 text-red-600 border border-red-100",
+                        hasRecords && !isSelected && "bg-indigo-50 text-indigo-600 border border-indigo-100",
                         isSelected && "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
                       )}
                     >
                       <span>{format(day, 'd')}</span>
                       {hasRecords && !isSelected && (
-                        <span className={cn("absolute bottom-1 w-1.5 h-1.5 rounded-full", isPartial ? "bg-red-500" : "bg-indigo-500")}></span>
+                        <span className={cn("absolute bottom-1 w-1.5 h-1.5 rounded-full", dotColorNormal)}></span>
                       )}
                       {isSelected && hasRecords && (
-                         <span className={cn("absolute bottom-1 w-1.5 h-1.5 rounded-full", isPartial ? "bg-red-300" : "bg-white")}></span>
+                         <span className={cn("absolute bottom-1 w-1.5 h-1.5 rounded-full", dotColorSelected)}></span>
                       )}
                     </button>
                   </div>
@@ -1151,15 +1185,6 @@ export default function ControleDiariaApp() {
                    R$ {formatCurrency(annualData.totalAnual)}
                  </div>
                </div>
-            </div>
-
-            <div className="mt-8 flex justify-center pb-8 shrink-0">
-              <button 
-                onClick={() => setView('calendar')} 
-                className="bg-white text-slate-700 border border-slate-200 font-semibold py-3 px-8 rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
-               >
-                Voltar ao Calendário
-              </button>
             </div>
           </div>
         ) : view === 'blank' ? (
@@ -1651,120 +1676,83 @@ export default function ControleDiariaApp() {
           </div>
         ) : null}
       </main>
-      </>
-      )}
 
-      {/* SIDEBAR DRAWER */}
+      {/* SIDEBAR DRAWER (NOW A FULL-WIDTH PANEL BELOW HEADER) */}
       <AnimatePresence>
         {isSidebarOpen && (
-            <motion.div 
-              key="overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.4 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-slate-900 z-40"
-            />
-        )}
-        {isSidebarOpen && (
             <motion.div
-              key="drawer"
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
+              key="panel"
+              initial={{ y: -50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -50, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 h-full w-[85%] max-w-sm bg-white z-50 shadow-2xl flex flex-col font-sans"
+              className="absolute top-0 left-0 w-full h-full bg-slate-50/95 backdrop-blur-md z-40 flex flex-col font-sans"
             >
-              <div className="p-6 md:p-8 flex items-center justify-between border-b border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm overflow-hidden border border-slate-200">
-                    {userProfile.photoUrl ? (
-                      <img src={userProfile.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'RF'
-                    )}
-                  </div>
-                  <h2 className="font-bold text-slate-800 text-lg leading-tight uppercase tracking-wide">Controle<br/>de Diária</h2>
+              <div className="p-6 md:p-8 flex flex-col items-center justify-center border-b border-slate-100 bg-white shadow-sm">
+                <div className="w-full flex items-center justify-between max-w-sm mx-auto">
+                  <h2 className="font-bold text-slate-800 text-xl leading-tight tracking-wide">Selecionar Mês</h2>
+                  <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-800 bg-slate-50 p-2 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
-                <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-800 bg-slate-50 p-2 rounded-full transition-colors">
-                  <X className="w-6 h-6" />
-                </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 py-6 space-y-2">
-                {monthsList.map((monthName, index) => {
-                  const monthDate = setMonth(displayedMonth, index);
-                  const isCurMonth = isSameMonth(monthDate, displayedMonth);
-                  
-                  // A naive way to check if a month is in the past compared to current viewing year/month
-                  const isPast = getYear(monthDate) < getYear(displayedMonth) || 
-                                (getYear(monthDate) === getYear(displayedMonth) && index < displayedMonth.getMonth());
-                  
-                  let stateClass = "text-slate-600 hover:bg-slate-50 bg-white border border-transparent";
-                  let dot = null;
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center">
+                <div className="grid grid-cols-4 gap-4 w-full max-w-sm">
+                  {monthsList.map((monthName, index) => {
+                    const monthDate = setMonth(displayedMonth, index);
+                    const isCurMonth = isSameMonth(monthDate, displayedMonth);
+                    
+                    const isPast = getYear(monthDate) < getYear(displayedMonth) || 
+                                  (getYear(monthDate) === getYear(displayedMonth) && index < displayedMonth.getMonth());
+                    
+                    let stateClass = "text-slate-600 hover:bg-slate-100 bg-white border border-slate-100 shadow-sm";
+                    let dot = null;
 
-                  if (isCurMonth) {
-                    stateClass = "bg-indigo-600 text-white font-bold border-indigo-600 shadow-sm";
-                  } else if (isPast) {
-                    stateClass = "text-purple-700 bg-purple-50 border border-purple-100";
-                    dot = <span className="w-2 h-2 rounded-full bg-purple-400"></span>;
-                  }
+                    if (isCurMonth) {
+                      stateClass = "bg-indigo-600 text-white font-bold border-indigo-600 shadow-md shadow-indigo-600/20";
+                    } else if (isPast) {
+                      stateClass = "text-indigo-400 bg-indigo-50/50 border border-indigo-50/50";
+                      dot = <span className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo-300"></span>;
+                    }
 
-                  return (
-                    <button
-                      key={monthName}
-                      onClick={() => selectMonthFromSidebar(index)}
-                      className={cn(
-                        "w-full flex items-center justify-between px-5 py-4 rounded-xl text-lg font-medium transition-all",
-                        stateClass
-                      )}
-                    >
-                      <span className="capitalize">{monthName}</span>
-                      {dot}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={monthName}
+                        onClick={() => selectMonthFromSidebar(index)}
+                        className={cn(
+                          "w-full aspect-[4/3] flex flex-col items-center justify-center rounded-2xl text-sm font-bold transition-all relative overflow-hidden",
+                          stateClass
+                        )}
+                      >
+                        <span className="capitalize">{monthName.substring(0, 3)}</span>
+                        {dot}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="p-6 border-t border-slate-100 bg-slate-50 mt-auto space-y-3">
-                 <button 
-                  onClick={() => {
-                    setView('annual-balance');
-                    setIsSidebarOpen(false);
-                  }}
-                  className="w-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-md group"
-                 >
-                  <FileText className="w-5 h-5 text-indigo-300 group-hover:scale-110 transition-transform" />
-                  <span className="tracking-wide">Balancete Anual</span>
-                </button>
+              <div className="p-6 bg-slate-50 flex justify-center pb-8 border-t border-slate-200">
                  {userProfile.role === 'admin' && (
                     <button 
                       onClick={() => {
                         setView('admin');
                         setIsSidebarOpen(false);
                       }}
-                      className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm"
+                      className="w-full max-w-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm"
                     >
                       <User className="w-5 h-5" />
                       <span>Painel Admin</span>
                     </button>
                  )}
-                 {authUserId && (
-                   <button 
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      setView('welcome');
-                      setIsSidebarOpen(false);
-                    }}
-                    className="w-full bg-white hover:bg-red-50 text-red-600 border border-slate-200 hover:border-red-200 active:scale-95 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm"
-                   >
-                     Sair (Logout)
-                   </button>
-                 )}
               </div>
             </motion.div>
         )}
       </AnimatePresence>
+
+      </div>
+      )}
 
     </div>
   );
