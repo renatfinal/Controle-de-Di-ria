@@ -19,7 +19,8 @@ export async function fetchProfile(userId: string) {
 export async function saveProfile(userId: string, profile: any) {
   const { data, error } = await supabase
     .from('profiles')
-    .upsert({ id: userId, ...profile })
+    .update(profile)
+    .eq('id', userId)
     .select();
   if (error) throw error;
   return data;

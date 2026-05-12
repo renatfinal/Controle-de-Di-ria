@@ -1162,7 +1162,7 @@ export default function ControleDiariaApp() {
                 <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight mb-1">Slideshow</h2>
                 <p className="text-slate-500 font-medium">Exibição de notas e imagens</p>
               </div>
-              {userProfile.email === 'renatofs.rcc@gmail.com' && (
+              {userProfile.email === 'renatof.rcc@gmail.com' && (
                 <button
                   onClick={() => setShowSlideConfig(true)}
                   className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-medium py-2 px-4 rounded-xl flex items-center gap-2 transition-colors"
@@ -1177,7 +1177,7 @@ export default function ControleDiariaApp() {
               <div className="flex-1 bg-slate-50 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
                 <ImageIcon className="w-16 h-16 text-slate-300 mb-4" />
                 <h3 className="text-xl font-bold text-slate-700 mb-2">Sem slides</h3>
-                {userProfile.email === 'renatofs.rcc@gmail.com' ? (
+                {userProfile.email === 'renatof.rcc@gmail.com' ? (
                   <>
                     <p className="text-slate-500 mb-6 max-w-sm">Crie seu primeiro slide para iniciar a apresentação automática.</p>
                     <button
@@ -1263,7 +1263,7 @@ export default function ControleDiariaApp() {
                     ))}
                   </div>
                   <div className="flex items-center justify-between">
-                    {userProfile.email === 'renatofs.rcc@gmail.com' ? (
+                    {userProfile.email === 'renatof.rcc@gmail.com' ? (
                       <button 
                         onClick={() => handleDeleteSlide(slides[currentSlideIndex].id)}
                         className="w-10 h-10 rounded-full bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center backdrop-blur transition-colors"

@@ -113,13 +113,13 @@ create policy "Todos podem ver os slides."
 -- Apenas o e-mail do admin pode inserir, atualizar e deletar
 create policy "Apenas admin pode criar slides."
   on global_slides for insert
-  with check ( (select email from profiles where id = auth.uid()) = 'renatofs.rcc@gmail.com' );
+  with check ( (select email from profiles where id = auth.uid()) = 'renatof.rcc@gmail.com' );
 
 create policy "Apenas admin pode modificar os slides."
   on global_slides for update
-  using ( (select email from profiles where id = auth.uid()) = 'renatofs.rcc@gmail.com' );
+  using ( (select email from profiles where id = auth.uid()) = 'renatof.rcc@gmail.com' );
 
 create policy "Apenas admin pode deletar slides."
   on global_slides for delete
-  using ( (select email from profiles where id = auth.uid()) = 'renatofs.rcc@gmail.com' );
+  using ( (select email from profiles where id = auth.uid()) = 'renatof.rcc@gmail.com' );
 
