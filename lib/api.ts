@@ -50,6 +50,29 @@ export async function loadMonthlyRecords(userId: string, year: number, month: nu
   return records;
 }
 
+export async function loadYearlyRecords(userId: string, year: number) {
+  const datePattern = `${year}-%`;
+
+  const { data, error } = await supabase
+    .from('daily_entries')
+    .select('*')
+    .eq('user_id', userId)
+    .like('date_key', datePattern);
+
+  if (error) throw error;
+
+  const records: Record<string, DailyEntry[]> = {};
+  for (const row of data || []) {
+    if (!records[row.date_key]) records[row.date_key] = [];
+    records[row.date_key].push({
+      id: row.id,
+      label: row.label,
+      value: row.value
+    });
+  }
+  return records;
+}
+
 export async function saveDailyRecords(userId: string, dateKey: string, entries: DailyEntry[]) {
   // First delete existing records for this user and date
   await supabase

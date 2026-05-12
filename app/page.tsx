@@ -25,7 +25,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { supabase } from '../lib/supabase';
-import { loadMonthlyRecords, saveDailyRecords, saveProfile, fetchProfile, fetchAllUsers, toggleBlockUser, deleteUserProfile } from '../lib/api';
+import { loadMonthlyRecords, loadYearlyRecords, saveDailyRecords, saveProfile, fetchProfile, fetchAllUsers, toggleBlockUser, deleteUserProfile } from '../lib/api';
 import localforage from 'localforage';
 
 function cn(...inputs: ClassValue[]) {
@@ -130,15 +130,14 @@ export default function ControleDiariaApp() {
   useEffect(() => {
     if (authUserId) {
       const year = getYear(displayedMonth);
-      const month = displayedMonth.getMonth() + 1;
-      loadMonthlyRecords(authUserId, year, month)
+      loadYearlyRecords(authUserId, year)
         .then((dbRecords) => {
           // Merge local with DB, db takes precedence
           setRecords(prev => ({ ...prev, ...dbRecords }));
         })
         .catch(console.error);
     }
-  }, [authUserId, displayedMonth]);
+  }, [authUserId, getYear(displayedMonth)]);
 
   useEffect(() => {
     if (authUserId) {
