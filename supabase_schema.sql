@@ -84,3 +84,42 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- 4. Tabela de Slides Globais (global_slides)
+create table if not exists public.global_slides (
+  id uuid default gen_random_uuid() primary key,
+  type text not null,
+  content text,
+  media_url text,
+  media_type text,
+  bg_color text,
+  text_config jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Ativa RLS para global_slides
+alter table public.global_slides enable row level security;
+
+drop policy if exists "Todos podem ver os slides." on global_slides;
+drop policy if exists "Apenas admin pode modificar os slides." on global_slides;
+drop policy if exists "Apenas admin pode criar slides." on global_slides;
+drop policy if exists "Apenas admin pode deletar slides." on global_slides;
+
+-- Qualquer um logado pode ver
+create policy "Todos podem ver os slides."
+  on global_slides for select
+  using ( auth.uid() is not null );
+
+-- Apenas o e-mail do admin pode inserir, atualizar e deletar
+create policy "Apenas admin pode criar slides."
+  on global_slides for insert
+  with check ( (select email from profiles where id = auth.uid()) = 'renatofs.rcc@gmail.com' );
+
+create policy "Apenas admin pode modificar os slides."
+  on global_slides for update
+  using ( (select email from profiles where id = auth.uid()) = 'renatofs.rcc@gmail.com' );
+
+create policy "Apenas admin pode deletar slides."
+  on global_slides for delete
+  using ( (select email from profiles where id = auth.uid()) = 'renatofs.rcc@gmail.com' );
+

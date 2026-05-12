@@ -17,12 +17,16 @@ import {
   getYear
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff, Search, Shield, Users, Unlock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff, Search, Shield, Users, Unlock, Image as ImageIcon, Type, Play, Pause, Upload, Video, Bold, Italic, Type as TypeIcon } from 'lucide-react';
+
+// ... Inside ControleDiariaApp ...
+
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { supabase } from '../lib/supabase';
 import { loadMonthlyRecords, saveDailyRecords, saveProfile, fetchProfile, fetchAllUsers, toggleBlockUser, deleteUserProfile } from '../lib/api';
+import localforage from 'localforage';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -67,6 +71,39 @@ export default function ControleDiariaApp() {
   });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [adminSearchQuery, setAdminSearchQuery] = useState('');
+
+  // Slideshow States
+  type Slide = { 
+    id: string; 
+    type: 'text' | 'media'; 
+    content: string; 
+    mediaUrl?: string;
+    mediaType?: 'image' | 'video';
+    bgColor?: string;
+    textConfig?: {
+      color: string;
+      fontFamily: string;
+      isBold: boolean;
+      isItalic: boolean;
+      fontSize: number;
+    }
+  };
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showSlideConfig, setShowSlideConfig] = useState(false);
+  const [newSlideData, setNewSlideData] = useState<Partial<Slide>>({ 
+    type: 'text', 
+    content: '', 
+    bgColor: '#6366f1',
+    textConfig: {
+      color: '#ffffff',
+      fontFamily: 'Inter',
+      isBold: true,
+      isItalic: false,
+      fontSize: 32
+    }
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -125,6 +162,115 @@ export default function ControleDiariaApp() {
       fetchAllUsers().then(setAllUsers).catch(console.error);
     }
   }, [view, userProfile.role]);
+
+  // Load slides when user changes
+  useEffect(() => {
+    if (authUserId) {
+      import('../lib/slidesApi').then(({ fetchGlobalSlides }) => {
+        fetchGlobalSlides().then((dbSlides) => {
+          if (dbSlides && dbSlides.length > 0) {
+            setSlides(dbSlides);
+          } else {
+            // Fallback se não configurou Supabase ainda 
+            localforage.getItem(`slides_${authUserId}`).then((storedSlides: any) => {
+              if (storedSlides && storedSlides.length > 0) {
+                setSlides(storedSlides);
+              } else {
+                setSlides([{ 
+                  id: 'default', 
+                  type: 'text', 
+                  content: 'Bem-vindo ao seu painel!', 
+                  bgColor: '#6366f1',
+                  textConfig: { color: '#ffffff', fontFamily: 'Inter', isBold: true, isItalic: false, fontSize: 32 }
+                }]);
+              }
+            }).catch(e => console.error('Failed to parse slides', e));
+          }
+        }).catch(err => {
+          console.warn('Could not load global slides from Supabase, error or table missing:', err);
+          // Fallback to local
+          localforage.getItem(`slides_${authUserId}`).then((storedSlides: any) => {
+            if (storedSlides && storedSlides.length > 0) {
+              setSlides(storedSlides);
+            }
+          });
+        });
+      });
+    }
+  }, [authUserId]);
+
+  // Autoplay slides
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying && slides.length > 0) {
+      interval = setInterval(() => {
+        setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+      }, 5000); // 5 seconds per slide
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, slides.length]);
+
+  const handleSaveSlide = async () => {
+    if (!newSlideData.content?.trim() && newSlideData.type === 'text') return;
+    if (!newSlideData.mediaUrl && newSlideData.mediaType === 'image' && newSlideData.type !== 'text') return;
+    
+    try {
+      const { addGlobalSlide } = await import('../lib/slidesApi');
+      const savedDbSlide = await addGlobalSlide(newSlideData);
+      const updatedSlides = [...slides, savedDbSlide];
+      setSlides(updatedSlides);
+      setCurrentSlideIndex(updatedSlides.length - 1);
+    } catch (e) {
+      console.error('Failed to save slide globally. Ensure table global_slides is created.', e);
+      // Fallback
+      const newSlide: Slide = {
+        id: Date.now().toString(),
+        type: newSlideData.type as 'text' | 'media',
+        content: newSlideData.content || '',
+        mediaUrl: newSlideData.mediaUrl,
+        mediaType: newSlideData.mediaType,
+        bgColor: newSlideData.bgColor,
+        textConfig: newSlideData.textConfig
+      };
+      const updatedSlides = [...slides, newSlide];
+      setSlides(updatedSlides);
+      if (authUserId) {
+        localforage.setItem(`slides_${authUserId}`, updatedSlides).catch(console.error);
+      }
+      setCurrentSlideIndex(updatedSlides.length - 1);
+    }
+    
+    setShowSlideConfig(false);
+    setNewSlideData({ 
+      type: 'text', 
+      content: '', 
+      bgColor: '#6366f1',
+      textConfig: { color: '#ffffff', fontFamily: 'Inter', isBold: true, isItalic: false, fontSize: 32 }
+    });
+  };
+
+  const handleDeleteSlide = async (id: string) => {
+    try {
+      const { deleteGlobalSlide } = await import('../lib/slidesApi');
+      await deleteGlobalSlide(id);
+      const updatedSlides = slides.filter(s => s.id !== id);
+      setSlides(updatedSlides);
+      if (currentSlideIndex >= updatedSlides.length) {
+        setCurrentSlideIndex(Math.max(0, updatedSlides.length - 1));
+      }
+    } catch (e) {
+      console.error('Failed to delete slide globally.', e);
+      // Fallback
+      const updatedSlides = slides.filter(s => s.id !== id);
+      setSlides(updatedSlides);
+      if (authUserId) {
+        localforage.setItem(`slides_${authUserId}`, updatedSlides).catch(console.error);
+      }
+      if (currentSlideIndex >= updatedSlides.length) {
+        setCurrentSlideIndex(Math.max(0, updatedSlides.length - 1));
+      }
+    }
+  };
 
   const toggleBlock = async (id: string, isBlocked: boolean) => {
     await toggleBlockUser(id, !isBlocked);
@@ -727,8 +873,9 @@ export default function ControleDiariaApp() {
               <CalendarIcon className="w-6 h-6" />
             </button>
             <button 
-              onClick={() => setView('calendar')}
+              onClick={() => setView('blank')}
               className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
+              title="Slideshow"
             >
               <FileText className="w-6 h-6" />
             </button>
@@ -1008,18 +1155,344 @@ export default function ControleDiariaApp() {
             </div>
           </div>
         ) : view === 'blank' ? (
-          <div className="max-w-2xl mx-auto w-full flex flex-col p-4 lg:p-8 pb-24 h-full overflow-y-auto items-center justify-center">
-            <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm text-center">
-              <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-slate-800 mb-2">Página em Branco</h2>
-              <p className="text-slate-500 mb-8">Esta área está reservada para futuras funcionalidades.</p>
-              <button 
-                onClick={() => setView('calendar')} 
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl shadow-sm transition-colors"
-              >
-                Voltar para Calendário
-              </button>
+          <div className="max-w-2xl mx-auto w-full flex flex-col p-4 lg:p-8 pb-24 h-full relative">
+            
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight mb-1">Slideshow</h2>
+                <p className="text-slate-500 font-medium">Exibição de notas e imagens</p>
+              </div>
+              {userProfile.email === 'renatofs.rcc@gmail.com' && (
+                <button
+                  onClick={() => setShowSlideConfig(true)}
+                  className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-medium py-2 px-4 rounded-xl flex items-center gap-2 transition-colors"
+                  title="Adicionar Slide"
+                >
+                  <Plus className="w-5 h-5" /> Adicionar
+                </button>
+              )}
             </div>
+
+            {slides.length === 0 ? (
+              <div className="flex-1 bg-slate-50 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
+                <ImageIcon className="w-16 h-16 text-slate-300 mb-4" />
+                <h3 className="text-xl font-bold text-slate-700 mb-2">Sem slides</h3>
+                {userProfile.email === 'renatofs.rcc@gmail.com' ? (
+                  <>
+                    <p className="text-slate-500 mb-6 max-w-sm">Crie seu primeiro slide para iniciar a apresentação automática.</p>
+                    <button
+                      onClick={() => setShowSlideConfig(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl flex items-center gap-2 transition-colors"
+                    >
+                      <Plus className="w-5 h-5" /> Criar Slide
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-slate-500 mb-6 max-w-sm">A apresentação está vazia e somente o administrador pode adicionar slides.</p>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 rounded-3xl overflow-hidden relative shadow-xl min-h-[400px] flex items-center justify-center bg-slate-900 group">
+                <AnimatePresence mode="wait">
+                  {slides[currentSlideIndex].type === 'media' && slides[currentSlideIndex].mediaUrl && (
+                    <motion.div
+                      key={slides[currentSlideIndex].id + '-media'}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.05 }}
+                      transition={{ duration: 0.3 }}
+                      className="absolute inset-0"
+                    >
+                      {slides[currentSlideIndex].mediaType === 'video' ? (
+                         <video 
+                           src={slides[currentSlideIndex].mediaUrl} 
+                           autoPlay 
+                           loop 
+                           muted 
+                           className="w-full h-full object-cover" 
+                         />
+                      ) : (
+                        <img 
+                          src={slides[currentSlideIndex].mediaUrl} 
+                          alt="Slide Media" 
+                          className="w-full h-full object-cover opacity-80"
+                        />
+                      )}
+                    </motion.div>
+                  )}
+                  
+                  {(!slides[currentSlideIndex].type || slides[currentSlideIndex].type === 'text' || (slides[currentSlideIndex].type === 'media' && slides[currentSlideIndex].content)) && (
+                    <motion.div
+                      key={slides[currentSlideIndex].id + '-text'}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.3, delay: 0.1 }}
+                      className="absolute inset-0 flex items-center justify-center p-8 text-center"
+                      style={{ backgroundColor: slides[currentSlideIndex].type === 'text' ? (slides[currentSlideIndex].bgColor || '#6366f1') : 'transparent' }}
+                    >
+                      <div 
+                        style={{ 
+                          color: slides[currentSlideIndex].textConfig?.color || '#ffffff', 
+                          fontFamily: slides[currentSlideIndex].textConfig?.fontFamily || 'Inter',
+                          fontWeight: slides[currentSlideIndex].textConfig?.isBold ? 'bold' : 'normal',
+                          fontStyle: slides[currentSlideIndex].textConfig?.isItalic ? 'italic' : 'normal',
+                          fontSize: `${slides[currentSlideIndex].textConfig?.fontSize || 32}px`,
+                          textShadow: slides[currentSlideIndex].type === 'media' ? '0 4px 12px rgba(0,0,0,0.6)' : 'none'
+                        }}
+                        className="drop-shadow-md leading-tight max-w-2xl whitespace-pre-line px-4"
+                      >
+                        {slides[currentSlideIndex].content}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                {/* Controls Overlay */}
+                <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/60 to-transparent flex flex-col gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-center gap-2">
+                    {slides.map((_, i) => (
+                      <div 
+                        key={i} 
+                        className={clsx(
+                          "w-2 h-2 rounded-full transition-all cursor-pointer",
+                          i === currentSlideIndex ? "bg-white w-6" : "bg-white/50 hover:bg-white/80"
+                        )}
+                        onClick={() => setCurrentSlideIndex(i)}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    {userProfile.email === 'renatofs.rcc@gmail.com' ? (
+                      <button 
+                        onClick={() => handleDeleteSlide(slides[currentSlideIndex].id)}
+                        className="w-10 h-10 rounded-full bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center backdrop-blur transition-colors"
+                        title="Excluir Slide"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    ) : (
+                      <div className="w-10 h-10" />
+                    )}
+
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => setCurrentSlideIndex(prev => prev === 0 ? slides.length - 1 : prev - 1)}
+                        className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center backdrop-blur transition-colors"
+                      >
+                        <ChevronLeft className="w-8 h-8" />
+                      </button>
+                      <button 
+                        onClick={() => setIsPlaying(!isPlaying)}
+                        className="w-16 h-16 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
+                      >
+                        {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
+                      </button>
+                      <button 
+                        onClick={() => setCurrentSlideIndex(prev => (prev + 1) % slides.length)}
+                        className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center backdrop-blur transition-colors"
+                      >
+                        <ChevronRight className="w-8 h-8" />
+                      </button>
+                    </div>
+
+                    <div className="w-10 h-10" /> {/* Spacer to balance flex layout */}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showSlideConfig && (
+              <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h3 className="text-xl font-bold text-slate-800">Add novo slide</h3>
+                    <button onClick={() => setShowSlideConfig(false)} className="text-slate-400 hover:text-slate-600 bg-white shadow-sm p-1.5 rounded-full transition-colors">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 flex-1 overflow-y-auto">
+                    <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6">
+                      <button
+                        onClick={() => setNewSlideData({ ...newSlideData, type: 'text' })}
+                        className={clsx(
+                          "flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors",
+                          newSlideData.type === 'text' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                      >
+                        <Type className="w-4 h-4" /> Texto
+                      </button>
+                      <button
+                        onClick={() => setNewSlideData({ ...newSlideData, type: 'media' })}
+                        className={clsx(
+                          "flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors",
+                          newSlideData.type === 'media' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                      >
+                        <ImageIcon className="w-4 h-4" /> Imagem/Vídeo
+                      </button>
+                    </div>
+
+                    <div className="space-y-6">
+                      {newSlideData.type === 'media' && (
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2 block">Upload da Mídia</label>
+                          <label className="flex items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-slate-300 border-dashed rounded-2xl appearance-none cursor-pointer hover:border-indigo-400 focus:outline-none">
+                            <span className="flex items-center space-x-2">
+                               <Upload className="w-6 h-6 text-slate-400" />
+                               <span className="font-medium text-slate-600">
+                                 {newSlideData.mediaUrl ? "Alterar arquivo selecionado" : "Selecione uma imagem ou vídeo curto"}
+                               </span>
+                            </span>
+                            <input type="file" name="file_upload" className="hidden" accept="image/*,video/*" onChange={(e) => {
+                               const file = e.target.files?.[0];
+                               if (file) {
+                                 const reader = new FileReader();
+                                 reader.onload = (event) => {
+                                   if (event.target?.result) {
+                                     setNewSlideData(prev => ({
+                                       ...prev,
+                                       mediaUrl: event.target!.result as string,
+                                       mediaType: file.type.startsWith('video/') ? 'video' : 'image'
+                                     }));
+                                   }
+                                 };
+                                 reader.readAsDataURL(file);
+                               }
+                            }}/>
+                          </label>
+                          {newSlideData.mediaUrl && newSlideData.mediaType === 'image' && (
+                            <div className="mt-4 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 h-32">
+                              <img src={newSlideData.mediaUrl} alt="Preview" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                          {newSlideData.mediaUrl && newSlideData.mediaType === 'video' && (
+                            <div className="mt-4 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 h-32 flex items-center justify-center relative">
+                               <Video className="w-8 h-8 text-slate-400" />
+                               <span className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-xs rounded-md">Vídeo Selecionado</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">
+                          {newSlideData.type === 'media' ? 'Texto Sobreposto (Opcional)' : 'Mensagem'}
+                        </label>
+                        <textarea 
+                          value={newSlideData.content}
+                          onChange={(e) => setNewSlideData({ ...newSlideData, content: e.target.value })}
+                          className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-h-[100px] resize-none"
+                          placeholder={newSlideData.type === 'media' ? "Escreva algo sobre a imagem..." : "Escreva algo inspirador..."}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-4">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1 -mb-2">Estilo do Texto</label>
+                        <div className="flex items-center gap-2 flex-wrap bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                          <button
+                            onClick={() => setNewSlideData(p => ({ ...p, textConfig: { ...p.textConfig!, isBold: !p.textConfig?.isBold } }))}
+                            className={clsx("p-2 rounded-xl transition-colors", newSlideData.textConfig?.isBold ? "bg-indigo-100 text-indigo-700" : "text-slate-500 hover:bg-slate-200")}
+                            title="Negrito"
+                          >
+                            <Bold className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setNewSlideData(p => ({ ...p, textConfig: { ...p.textConfig!, isItalic: !p.textConfig?.isItalic } }))}
+                            className={clsx("p-2 rounded-xl transition-colors", newSlideData.textConfig?.isItalic ? "bg-indigo-100 text-indigo-700" : "text-slate-500 hover:bg-slate-200")}
+                            title="Itálico"
+                          >
+                            <Italic className="w-4 h-4" />
+                          </button>
+                          <div className="w-px h-6 bg-slate-300 mx-1"></div>
+                          <button
+                            onClick={() => setNewSlideData(p => ({ ...p, textConfig: { ...p.textConfig!, fontSize: Math.max(16, (p.textConfig?.fontSize || 32) - 4) } }))}
+                            className="p-2 text-slate-600 hover:bg-slate-200 rounded-xl"
+                            title="Diminuir Texto"
+                          >
+                            <TypeIcon className="w-3 h-3" />
+                          </button>
+                          <span className="text-sm font-medium w-8 text-center">{newSlideData.textConfig?.fontSize || 32}</span>
+                          <button
+                            onClick={() => setNewSlideData(p => ({ ...p, textConfig: { ...p.textConfig!, fontSize: Math.min(120, (p.textConfig?.fontSize || 32) + 4) } }))}
+                            className="p-2 text-slate-600 hover:bg-slate-200 rounded-xl"
+                            title="Aumentar Texto"
+                          >
+                            <TypeIcon className="w-5 h-5" />
+                          </button>
+                          <div className="w-px h-6 bg-slate-300 mx-1"></div>
+                          <select
+                            value={newSlideData.textConfig?.fontFamily || 'Inter'}
+                            onChange={(e) => setNewSlideData(p => ({ ...p, textConfig: { ...p.textConfig!, fontFamily: e.target.value } }))}
+                            className="bg-transparent border-none text-sm font-medium focus:ring-0 text-slate-700 p-2 cursor-pointer outline-none"
+                          >
+                            <option value="Inter">Inter</option>
+                            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="serif">Serif</option>
+                            <option value="monospace">Monospace</option>
+                            <option value="cursive">Cursive</option>
+                            <option value="system-ui">System</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2 block">Cor do Texto</label>
+                          <div className="flex gap-2 flex-wrap">
+                            {['#ffffff', '#000000', '#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa'].map(color => (
+                              <button
+                                key={color}
+                                onClick={() => setNewSlideData(p => ({ ...p, textConfig: { ...p.textConfig!, color } }))}
+                                className={clsx(
+                                  "w-8 h-8 rounded-full transition-transform border border-slate-200",
+                                  newSlideData.textConfig?.color === color ? "scale-110 ring-2 ring-offset-2 ring-slate-800" : "hover:scale-105"
+                                )}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {newSlideData.type === 'text' && (
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2 block">Cor de Fundo</label>
+                          <div className="flex gap-2 flex-wrap">
+                            {['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#1e293b'].map(color => (
+                              <button
+                                key={color}
+                                onClick={() => setNewSlideData({ ...newSlideData, bgColor: color })}
+                                className={clsx(
+                                  "w-10 h-10 rounded-full transition-transform",
+                                  newSlideData.bgColor === color ? "scale-110 ring-2 ring-offset-2 ring-slate-800" : "hover:scale-105"
+                                )}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 border-t border-slate-100 flex gap-3 bg-white">
+                     <button
+                      onClick={() => setShowSlideConfig(false)}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-colors"
+                     >
+                      Cancelar
+                     </button>
+                     <button
+                      onClick={handleSaveSlide}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+                     >
+                      Salvar Slide
+                     </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : view === 'admin' ? (
           <div className="max-w-5xl mx-auto w-full flex flex-col p-4 lg:p-8 pb-24 h-full overflow-y-auto">
