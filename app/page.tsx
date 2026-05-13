@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   format, 
   addMonths, 
@@ -435,6 +435,15 @@ export default function ControleDiariaApp() {
   // Keep local state for the form so we can edit without saving immediately
   const [formEntries, setFormEntries] = useState<DailyEntry[]>(currentEntries);
   const [prevDateKey, setPrevDateKey] = useState(dateKey);
+  const debounceRef = useRef<Record<string, NodeJS.Timeout>>({});
+
+  const autoSave = useCallback((key: string, entries: DailyEntry[]) => {
+    if (!authUserId) return;
+    if (debounceRef.current[key]) clearTimeout(debounceRef.current[key]);
+    debounceRef.current[key] = setTimeout(() => {
+      saveDailyRecords(authUserId, key, entries).catch(console.error);
+    }, 1000);
+  }, [authUserId]);
 
   if (dateKey !== prevDateKey) {
     setPrevDateKey(dateKey);
@@ -477,6 +486,7 @@ export default function ControleDiariaApp() {
       updated[index].value = formatCurrency(parsed);
       setFormEntries(updated);
       setRecords(prev => ({ ...prev, [dateKey]: updated }));
+      autoSave(dateKey, updated);
     }
   };
 
@@ -489,6 +499,7 @@ export default function ControleDiariaApp() {
     }
     setFormEntries(updated);
     setRecords(prev => ({ ...prev, [dateKey]: updated }));
+    autoSave(dateKey, updated);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number, field: 'label' | 'value') => {
@@ -515,6 +526,7 @@ export default function ControleDiariaApp() {
     const updated = [...formEntries, { id: Date.now().toString(), label: 'Nova Refeição (R$)', value: '' }];
     setFormEntries(updated);
     setRecords(prev => ({ ...prev, [dateKey]: updated }));
+    autoSave(dateKey, updated);
   };
 
   const removeEntry = (index: number) => {
@@ -522,6 +534,7 @@ export default function ControleDiariaApp() {
     updated.splice(index, 1);
     setFormEntries(updated);
     setRecords(prev => ({ ...prev, [dateKey]: updated }));
+    autoSave(dateKey, updated);
   };
 
   const saveDay = async () => {

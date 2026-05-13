@@ -34,7 +34,8 @@ export async function loadMonthlyRecords(userId: string, year: number, month: nu
     .from('daily_entries')
     .select('*')
     .eq('user_id', userId)
-    .like('date_key', datePattern);
+    .like('date_key', datePattern)
+    .limit(10000);
 
   if (error) throw error;
 
@@ -57,7 +58,8 @@ export async function loadYearlyRecords(userId: string, year: number) {
     .from('daily_entries')
     .select('*')
     .eq('user_id', userId)
-    .like('date_key', datePattern);
+    .like('date_key', datePattern)
+    .limit(10000);
 
   if (error) throw error;
 
