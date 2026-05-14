@@ -646,6 +646,73 @@ export default function ControleDiariaApp() {
 
   return (
     <div className="h-screen bg-slate-50 text-slate-900 flex flex-col font-sans overflow-hidden">
+      {(authUserId && view !== 'welcome' && view !== 'login') && (
+        <header className="bg-white border-b border-slate-200 px-6 lg:px-10 py-4 lg:h-24 flex flex-shrink-0 items-center gap-4 overflow-x-auto z-[60] relative w-full shadow-sm">
+          <button 
+            onClick={() => setView('register')}
+            className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-bold text-xl hover:bg-slate-800 shadow-sm shrink-0 transition-colors overflow-hidden relative"
+          >
+            {userProfile.photoUrl ? (
+              <img src={userProfile.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'RF'
+            )}
+          </button>
+          <button 
+            onClick={() => setView('calendar')}
+            className="w-14 h-14 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex flex-col items-center justify-center hover:bg-indigo-100 shadow-sm shrink-0 transition-colors"
+            title="Calendário"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-widest leading-none mb-1">
+              {format(currentDate, 'MMM', { locale: ptBR })}
+            </span>
+            <span className="text-xl font-black leading-none">
+              {format(currentDate, 'dd')}
+            </span>
+          </button>
+          <button 
+            onClick={() => setView('blank')}
+            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
+            title="Slideshow"
+          >
+            <FileText className="w-6 h-6" />
+          </button>
+          <button 
+            onClick={() => setView('annual-balance')}
+            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
+          >
+            <BarChart3 className="w-6 h-6" />
+          </button>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
+            title="Menu de Meses"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          {userProfile.role === 'admin' && (
+            <button 
+              onClick={() => setView('admin')}
+              className="w-14 h-14 bg-slate-900 border border-slate-900 text-indigo-400 rounded-2xl flex items-center justify-center hover:bg-slate-800 shadow-sm shrink-0 transition-colors ml-auto mr-0 lg:ml-4 lg:mr-0"
+              title="Painel Administrativo"
+            >
+              <Shield className="w-6 h-6" />
+            </button>
+          )}
+          
+          <div className="flex-1 flex justify-end items-center hidden lg:flex">
+            {view === 'calendar' && (
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 ml-4 shrink-0">
+                <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                <span className="text-slate-700 text-sm font-semibold tracking-wide uppercase">
+                  {format(currentDate, 'dd / MMM / yyyy', { locale: ptBR })}
+                </span>
+              </div>
+            )}
+          </div>
+        </header>
+      )}
+
       {view === 'welcome' && (
         <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 min-h-screen">
           <div className="w-24 h-24 bg-indigo-600 rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-indigo-600/20">
@@ -678,12 +745,9 @@ export default function ControleDiariaApp() {
       )}
 
       {view === 'register' && (
-        <div className="flex-1 overflow-y-auto bg-slate-50 py-10 px-4">
+        <div className="flex-1 overflow-y-auto bg-slate-50 pt-10 pb-24 px-4">
           <div className="max-w-md mx-auto bg-white rounded-[32px] shadow-sm border border-slate-200 p-8">
             <div className="mb-8">
-              <button onClick={() => setView(userProfile.name ? 'calendar' : 'welcome')} className="text-slate-400 hover:text-slate-800 mb-6 transition-colors p-2 -ml-2 rounded-xl hover:bg-slate-50">
-                <ChevronLeft className="w-6 h-6" />
-              </button>
               <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight">{authUserId ? 'Meu Perfil' : 'Criar Perfil'}</h2>
               <p className="text-slate-500 mt-1 font-medium">{authUserId ? 'Atualize suas informações pessoais ou senha' : 'Configure suas informações pessoais'}</p>
             </div>
@@ -881,73 +945,6 @@ export default function ControleDiariaApp() {
             </button>
           </div>
         </div>
-      )}
-
-      {(authUserId && view !== 'welcome' && view !== 'login') && (
-        <header className="bg-white border-b border-slate-200 px-6 lg:px-10 py-4 lg:h-24 flex flex-shrink-0 items-center gap-4 overflow-x-auto z-[60] relative w-full shadow-sm">
-          <button 
-            onClick={() => setView('register')}
-            className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-bold text-xl hover:bg-slate-800 shadow-sm shrink-0 transition-colors overflow-hidden relative"
-          >
-            {userProfile.photoUrl ? (
-              <img src={userProfile.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'RF'
-            )}
-          </button>
-          <button 
-            onClick={() => setView('calendar')}
-            className="w-14 h-14 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex flex-col items-center justify-center hover:bg-indigo-100 shadow-sm shrink-0 transition-colors"
-            title="Calendário"
-          >
-            <span className="text-[10px] font-bold uppercase tracking-widest leading-none mb-1">
-              {format(currentDate, 'MMM', { locale: ptBR })}
-            </span>
-            <span className="text-xl font-black leading-none">
-              {format(currentDate, 'dd')}
-            </span>
-          </button>
-          <button 
-            onClick={() => setView('blank')}
-            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
-            title="Slideshow"
-          >
-            <FileText className="w-6 h-6" />
-          </button>
-          <button 
-            onClick={() => setView('annual-balance')}
-            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
-          >
-            <BarChart3 className="w-6 h-6" />
-          </button>
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="w-14 h-14 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl flex items-center justify-center hover:bg-slate-100 shadow-sm shrink-0 transition-colors"
-            title="Menu de Meses"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          {userProfile.role === 'admin' && (
-            <button 
-              onClick={() => setView('admin')}
-              className="w-14 h-14 bg-slate-900 border border-slate-900 text-indigo-400 rounded-2xl flex items-center justify-center hover:bg-slate-800 shadow-sm shrink-0 transition-colors ml-auto mr-0 lg:ml-4 lg:mr-0"
-              title="Painel Administrativo"
-            >
-              <Shield className="w-6 h-6" />
-            </button>
-          )}
-          
-          <div className="flex-1 flex justify-end items-center hidden lg:flex">
-            {view === 'calendar' && (
-              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 ml-4 shrink-0">
-                <CalendarIcon className="w-4 h-4 text-indigo-600" />
-                <span className="text-slate-700 text-sm font-semibold tracking-wide uppercase">
-                  {format(currentDate, 'dd / MMM / yyyy', { locale: ptBR })}
-                </span>
-              </div>
-            )}
-          </div>
-        </header>
       )}
 
       {(view === 'calendar' || view === 'annual-balance' || view === 'blank' || view === 'admin') && (
