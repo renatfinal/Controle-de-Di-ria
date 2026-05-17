@@ -48,6 +48,7 @@ export async function loadMonthlyRecords(userId: string, year: number, month: nu
       value: row.value
     });
   }
+
   return records;
 }
 
@@ -72,6 +73,7 @@ export async function loadYearlyRecords(userId: string, year: number) {
       value: row.value
     });
   }
+
   return records;
 }
 
@@ -124,10 +126,6 @@ export async function toggleBlockUser(userId: string, isBlocked: boolean) {
   if (error) throw error;
 }
 
-// Real delete might require a secure backend API with service role, 
-// but we can do a soft-delete or delete profile if RLS permits.
-// Usually, users cannot delete other users' auth accounts from the client unless using Edge Functions with service role.
-// We will just do what we can on the profile level.
 export async function deleteUserProfile(userId: string) {
   // First delete all their entries
   await supabase.from('daily_entries').delete().eq('user_id', userId);

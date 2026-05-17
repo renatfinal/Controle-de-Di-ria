@@ -71,6 +71,7 @@ export default function ControleDiariaApp() {
   });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [adminSearchQuery, setAdminSearchQuery] = useState('');
+  const [annualNotes, setAnnualNotes] = useState('');
 
   // Slideshow States
   type Slide = { 
@@ -90,7 +91,7 @@ export default function ControleDiariaApp() {
   };
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [showSlideConfig, setShowSlideConfig] = useState(false);
   const [newSlideData, setNewSlideData] = useState<Partial<Slide>>({ 
     type: 'text', 
@@ -136,6 +137,12 @@ export default function ControleDiariaApp() {
           setRecords(prev => ({ ...prev, ...dbRecords }));
         })
         .catch(console.error);
+        
+      localforage.getItem(`annualNotes_${authUserId}`).then((notes: any) => {
+        if (notes && typeof notes === 'string') {
+          setAnnualNotes(notes);
+        }
+      });
     }
   }, [authUserId, getYear(displayedMonth)]);
 
@@ -211,7 +218,7 @@ export default function ControleDiariaApp() {
     if (isPlaying && slides.length > 0) {
       interval = setInterval(() => {
         setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
-      }, 5000); // 5 seconds per slide
+      }, 10000); // 10 seconds per slide
     }
     return () => clearInterval(interval);
   }, [isPlaying, slides.length]);
@@ -1179,6 +1186,28 @@ export default function ControleDiariaApp() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-6 shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 lg:p-6 flex flex-col">
+              <label 
+                htmlFor="annual-notes" 
+                className="block text-slate-500 font-bold tracking-widest uppercase text-xs mb-3"
+              >
+                Anotações (4 linhas)
+              </label>
+              <textarea
+                id="annual-notes"
+                value={annualNotes}
+                onChange={(e) => {
+                  setAnnualNotes(e.target.value);
+                  if (authUserId) {
+                    localforage.setItem(`annualNotes_${authUserId}`, e.target.value).catch(console.error);
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none text-slate-700 shadow-inner"
+                placeholder="Escreva suas observações para o ano..."
+                rows={4}
+              />
             </div>
 
             <div className="bg-[#1e2330] rounded-2xl p-6 lg:p-8 flex justify-between items-center text-white shadow-xl mt-6 shrink-0">
