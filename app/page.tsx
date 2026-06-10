@@ -722,8 +722,8 @@ export default function ControleDiariaApp() {
 
       {view === 'welcome' && (
         <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 min-h-screen">
-          <div className="w-24 h-24 bg-indigo-600 rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-indigo-600/20">
-            <Wallet className="w-12 h-12 text-white" />
+          <div className="w-32 h-32 rounded-[2rem] bg-indigo-600 flex items-center justify-center mb-8 shadow-xl shadow-indigo-600/20 overflow-hidden">
+            <img src="/logo.png" alt="Logo Controle de Diária" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-4xl lg:text-5xl font-extrabold text-[#1a2332] tracking-tight mb-2 text-center">
             Controle de Diária
