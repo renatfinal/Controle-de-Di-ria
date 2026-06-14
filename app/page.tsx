@@ -735,7 +735,7 @@ export default function ControleDiariaApp() {
           <div className="w-full max-w-sm space-y-4">
             <button 
               onClick={() => setView('register')}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-colors shadow-lg shadow-indigo-600/30 active:scale-95 text-lg"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-colors shadow-lg shadow-purple-600/30 active:scale-95 text-lg"
             >
               <User className="w-5 h-5" />
               Primeiro Acesso
