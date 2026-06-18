@@ -42,11 +42,19 @@ export async function loadMonthlyRecords(userId: string, year: number, month: nu
   const records: Record<string, DailyEntry[]> = {};
   for (const row of data || []) {
     if (!records[row.date_key]) records[row.date_key] = [];
-    records[row.date_key].push({
+    
+    const existingIndex = records[row.date_key].findIndex(e => e.label === row.label);
+    const entry = {
       id: row.id,
       label: row.label,
       value: row.value
-    });
+    };
+    
+    if (existingIndex >= 0) {
+      records[row.date_key][existingIndex] = entry;
+    } else {
+      records[row.date_key].push(entry);
+    }
   }
 
   return records;
@@ -67,11 +75,19 @@ export async function loadYearlyRecords(userId: string, year: number) {
   const records: Record<string, DailyEntry[]> = {};
   for (const row of data || []) {
     if (!records[row.date_key]) records[row.date_key] = [];
-    records[row.date_key].push({
+    
+    const existingIndex = records[row.date_key].findIndex(e => e.label === row.label);
+    const entry = {
       id: row.id,
       label: row.label,
       value: row.value
-    });
+    };
+    
+    if (existingIndex >= 0) {
+      records[row.date_key][existingIndex] = entry;
+    } else {
+      records[row.date_key].push(entry);
+    }
   }
 
   return records;

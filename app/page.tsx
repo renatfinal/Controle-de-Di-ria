@@ -38,18 +38,15 @@ type DailyEntry = {
   value: string; // Store as string for easier input handling
 };
 
-const INITIAL_RECORDS: Record<string, DailyEntry[]> = {
-  '2026-05-03': [{ id: '1', label: 'Almoço (R$)', value: '44,00' }, { id: '2', label: 'Janta (R$)', value: '44,00' }],
-  '2026-05-04': [{ id: '1', label: 'Almoço (R$)', value: '44,00' }, { id: '2', label: 'Janta (R$)', value: '44,00' }],
-  '2026-05-05': [{ id: '1', label: 'Almoço (R$)', value: '44,00' }, { id: '2', label: 'Janta (R$)', value: '44,00' }],
-  '2026-05-06': [{ id: '1', label: 'Almoço (R$)', value: '44,00' }, { id: '2', label: 'Janta (R$)', value: '44,00' }],
-  '2026-05-09': [{ id: '1', label: 'Almoço (R$)', value: '44,00' }, { id: '2', label: 'Janta (R$)', value: '44,00' }],
-};
+const DEFAULT_ENTRIES: DailyEntry[] = [
+  { id: 'default-1', label: 'Almoço (R$)', value: '' },
+  { id: 'default-2', label: 'Janta (R$)', value: '' }
+];
 
 export default function ControleDiariaApp() {
   const [currentDate, setCurrentDate] = useState(new Date()); // Today
   const [displayedMonth, setDisplayedMonth] = useState(startOfMonth(new Date()));
-  const [records, setRecords] = useState<Record<string, DailyEntry[]>>(INITIAL_RECORDS);
+  const [records, setRecords] = useState<Record<string, DailyEntry[]>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [view, setView] = useState<'welcome' | 'register' | 'login' | 'calendar' | 'annual-balance' | 'blank' | 'admin'>('welcome');
@@ -433,29 +430,35 @@ export default function ControleDiariaApp() {
   
   // Initialize entries for current day if empty
   const currentEntries = useMemo(() => {
-    return records[dateKey] || [
-      { id: 'default-1', label: 'Almoço (R$)', value: '' },
-      { id: 'default-2', label: 'Janta (R$)', value: '' }
-    ];
+    return records[dateKey] || DEFAULT_ENTRIES;
   }, [dateKey, records]);
   
   // Keep local state for the form so we can edit without saving immediately
   const [formEntries, setFormEntries] = useState<DailyEntry[]>(currentEntries);
   const [prevDateKey, setPrevDateKey] = useState(dateKey);
+  const [prevEntries, setPrevEntries] = useState(currentEntries);
   const debounceRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  if (currentEntries !== prevEntries || dateKey !== prevDateKey) {
+    setPrevDateKey(dateKey);
+    setPrevEntries(currentEntries);
+    setFormEntries(currentEntries);
+  }
 
   const autoSave = useCallback((key: string, entries: DailyEntry[]) => {
     if (!authUserId) return;
     if (debounceRef.current[key]) clearTimeout(debounceRef.current[key]);
     debounceRef.current[key] = setTimeout(() => {
-      saveDailyRecords(authUserId, key, entries).catch(console.error);
+      saveQueueRef.current = saveQueueRef.current.then(async () => {
+        try {
+          await saveDailyRecords(authUserId, key, entries);
+        } catch (err) {
+          console.error(err);
+        }
+      });
     }, 1000);
   }, [authUserId]);
-
-  if (dateKey !== prevDateKey) {
-    setPrevDateKey(dateKey);
-    setFormEntries(currentEntries);
-  }
 
   // Handle month navigation
   const nextMonth = () => setDisplayedMonth(addMonths(displayedMonth, 1));
@@ -499,6 +502,7 @@ export default function ControleDiariaApp() {
 
   const updateEntry = (index: number, field: 'label' | 'value', newValue: string) => {
     const updated = [...formEntries];
+    updated[index] = { ...updated[index] };
     if (field === 'value') {
       updated[index][field] = formatValue(newValue);
     } else {
@@ -551,11 +555,13 @@ export default function ControleDiariaApp() {
     }));
     
     if (authUserId) {
-      try {
-        await saveDailyRecords(authUserId, dateKey, formEntries);
-      } catch (err) {
-        console.error('Failed to save to Supabase', err);
-      }
+      saveQueueRef.current = saveQueueRef.current.then(async () => {
+        try {
+          await saveDailyRecords(authUserId, dateKey, formEntries);
+        } catch (err) {
+          console.error('Failed to save to Supabase', err);
+        }
+      });
     }
 
     setIsSaved(true);
