@@ -17,7 +17,7 @@ import {
   getYear
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff, Search, Shield, Users, Unlock, Image as ImageIcon, Type, Play, Pause, Upload, Video, Bold, Italic, Type as TypeIcon, Menu, BarChart3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, Plus, Trash2, X, Wallet, AlignLeft, FileText, Camera, User, Mail, Phone, Lock, ArrowRight, LogIn, Eye, EyeOff, Search, Shield, Users, Unlock, Image as ImageIcon, Type, Play, Pause, Upload, Video, Bold, Italic, Type as TypeIcon, Menu, BarChart3, Heart } from 'lucide-react';
 
 // ... Inside ControleDiariaApp ...
 
@@ -1146,6 +1146,15 @@ export default function ControleDiariaApp() {
               <Wallet className="w-5 h-5" />
               {isSaved ? 'Registro Salvo e Seguro' : 'Salvar Registros'}
             </button>
+            <a
+              href="https://mpago.li/2SoYfa3"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 w-full py-4 rounded-2xl font-bold text-center flex items-center justify-center gap-3 transition-all text-white border-2 border-indigo-400/50 hover:bg-indigo-800 hover:border-indigo-300 active:scale-95 text-lg shadow-[0_0_15px_-3px_rgba(99,102,241,0.2)] group"
+            >
+              <Heart className="w-5 h-5 text-pink-400 transition-transform group-hover:scale-110" />
+              Seja um Colaborador desse APP
+            </a>
           </div>
         </aside>
         </div>
