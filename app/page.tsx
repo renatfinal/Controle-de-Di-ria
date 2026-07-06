@@ -141,7 +141,7 @@ export default function ControleDiariaApp() {
         }
       });
     }
-  }, [authUserId, getYear(displayedMonth)]);
+  }, [authUserId, displayedMonth]);
 
   useEffect(() => {
     if (authUserId) {
@@ -168,10 +168,10 @@ export default function ControleDiariaApp() {
   }, [authUserId]);
 
   useEffect(() => {
-    if (view === 'admin' && userProfile.role === 'admin') {
+    if (view === 'admin' && (userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com')) {
       fetchAllUsers().then(setAllUsers).catch(console.error);
     }
-  }, [view, userProfile.role]);
+  }, [view, userProfile.role, userProfile.email]);
 
   // Load slides when user changes
   useEffect(() => {
@@ -225,29 +225,46 @@ export default function ControleDiariaApp() {
     if (!newSlideData.mediaUrl && newSlideData.mediaType === 'image' && newSlideData.type !== 'text') return;
     
     try {
-      const { addGlobalSlide } = await import('../lib/slidesApi');
-      const savedDbSlide = await addGlobalSlide(newSlideData);
-      const updatedSlides = [...slides, savedDbSlide];
-      setSlides(updatedSlides);
-      setCurrentSlideIndex(updatedSlides.length - 1);
+      if (newSlideData.id) {
+        // Update existing
+        const { updateGlobalSlide } = await import('../lib/slidesApi');
+        const savedDbSlide = await updateGlobalSlide(newSlideData.id, newSlideData);
+        const updatedSlides = slides.map(s => s.id === newSlideData.id ? savedDbSlide : s);
+        setSlides(updatedSlides);
+      } else {
+        // Create new
+        const { addGlobalSlide } = await import('../lib/slidesApi');
+        const savedDbSlide = await addGlobalSlide(newSlideData);
+        const updatedSlides = [...slides, savedDbSlide];
+        setSlides(updatedSlides);
+        setCurrentSlideIndex(updatedSlides.length - 1);
+      }
     } catch (e) {
       console.error('Failed to save slide globally. Ensure table global_slides is created.', e);
       // Fallback
-      const newSlide: Slide = {
-        id: Date.now().toString(),
-        type: newSlideData.type as 'text' | 'media',
-        content: newSlideData.content || '',
-        mediaUrl: newSlideData.mediaUrl,
-        mediaType: newSlideData.mediaType,
-        bgColor: newSlideData.bgColor,
-        textConfig: newSlideData.textConfig
-      };
-      const updatedSlides = [...slides, newSlide];
-      setSlides(updatedSlides);
-      if (authUserId) {
-        localforage.setItem(`slides_${authUserId}`, updatedSlides).catch(console.error);
+      if (newSlideData.id) {
+        const updatedSlides = slides.map(s => s.id === newSlideData.id ? (newSlideData as Slide) : s);
+        setSlides(updatedSlides);
+        if (authUserId) {
+          localforage.setItem(`slides_${authUserId}`, updatedSlides).catch(console.error);
+        }
+      } else {
+        const newSlide: Slide = {
+          id: Date.now().toString(),
+          type: newSlideData.type as 'text' | 'media',
+          content: newSlideData.content || '',
+          mediaUrl: newSlideData.mediaUrl,
+          mediaType: newSlideData.mediaType,
+          bgColor: newSlideData.bgColor,
+          textConfig: newSlideData.textConfig
+        };
+        const updatedSlides = [...slides, newSlide];
+        setSlides(updatedSlides);
+        if (authUserId) {
+          localforage.setItem(`slides_${authUserId}`, updatedSlides).catch(console.error);
+        }
+        setCurrentSlideIndex(updatedSlides.length - 1);
       }
-      setCurrentSlideIndex(updatedSlides.length - 1);
     }
     
     setShowSlideConfig(false);
@@ -703,7 +720,7 @@ export default function ControleDiariaApp() {
           >
             <Menu className="w-6 h-6" />
           </button>
-          {userProfile.role === 'admin' && (
+          {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com') && (
             <button 
               onClick={() => setView('admin')}
               className="w-14 h-14 bg-slate-900 border border-slate-900 text-indigo-400 rounded-2xl flex items-center justify-center hover:bg-slate-800 shadow-sm shrink-0 transition-colors ml-auto mr-0 lg:ml-4 lg:mr-0"
@@ -779,7 +796,7 @@ export default function ControleDiariaApp() {
                   ) : (
                     <User className="w-12 h-12 text-slate-400" />
                   )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 transition-opacity">
                     <Camera className="w-8 h-8 text-white" />
                   </div>
                 </div>
@@ -1248,7 +1265,7 @@ export default function ControleDiariaApp() {
                 <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight mb-1">Slideshow</h2>
                 <p className="text-slate-500 font-medium">Exibição de notas e imagens</p>
               </div>
-              {userProfile.email === 'renatof.rcc@gmail.com' && (
+              {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com' || authUserId) && (
                 <button
                   onClick={() => setShowSlideConfig(true)}
                   className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-medium py-2 px-4 rounded-xl flex items-center gap-2 transition-colors"
@@ -1263,7 +1280,7 @@ export default function ControleDiariaApp() {
               <div className="flex-1 bg-slate-50 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
                 <ImageIcon className="w-16 h-16 text-slate-300 mb-4" />
                 <h3 className="text-xl font-bold text-slate-700 mb-2">Sem slides</h3>
-                {userProfile.email === 'renatof.rcc@gmail.com' ? (
+                {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com') ? (
                   <>
                     <p className="text-slate-500 mb-6 max-w-sm">Crie seu primeiro slide para iniciar a apresentação automática.</p>
                     <button
@@ -1314,7 +1331,7 @@ export default function ControleDiariaApp() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.3, delay: 0.1 }}
-                      className="absolute inset-0 flex items-center justify-center p-8 text-center"
+                      className="absolute inset-0 flex items-center justify-center p-8 text-center z-10"
                       style={{ backgroundColor: slides[currentSlideIndex].type === 'text' ? (slides[currentSlideIndex].bgColor || '#6366f1') : 'transparent' }}
                     >
                       <div 
@@ -1335,8 +1352,8 @@ export default function ControleDiariaApp() {
                 </AnimatePresence>
                 
                 {/* Controls Overlay */}
-                <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/60 to-transparent flex flex-col gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="flex justify-center gap-2">
+                <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/60 to-transparent flex flex-col gap-4 opacity-100 transition-opacity z-30 pointer-events-none">
+                  <div className="flex justify-center gap-2 pointer-events-auto">
                     {slides.map((_, i) => (
                       <div 
                         key={i} 
@@ -1348,15 +1365,27 @@ export default function ControleDiariaApp() {
                       />
                     ))}
                   </div>
-                  <div className="flex items-center justify-between">
-                    {userProfile.email === 'renatof.rcc@gmail.com' ? (
-                      <button 
-                        onClick={() => handleDeleteSlide(slides[currentSlideIndex].id)}
-                        className="w-10 h-10 rounded-full bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center backdrop-blur transition-colors"
-                        title="Excluir Slide"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                  <div className="flex items-center justify-between pointer-events-auto">
+                    {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com') ? (
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            setNewSlideData(slides[currentSlideIndex]);
+                            setShowSlideConfig(true);
+                          }}
+                          className="w-10 h-10 rounded-full bg-blue-500/80 hover:bg-blue-500 text-white flex items-center justify-center backdrop-blur transition-colors"
+                          title="Editar Slide"
+                        >
+                          <Pencil className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteSlide(slides[currentSlideIndex].id)}
+                          className="w-10 h-10 rounded-full bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center backdrop-blur transition-colors"
+                          title="Excluir Slide"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     ) : (
                       <div className="w-10 h-10" />
                     )}
@@ -1392,7 +1421,7 @@ export default function ControleDiariaApp() {
               <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                   <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <h3 className="text-xl font-bold text-slate-800">Add novo slide</h3>
+                    <h3 className="text-xl font-bold text-slate-800">{newSlideData.id ? "Editar Slide" : "Adicionar Slide"}</h3>
                     <button onClick={() => setShowSlideConfig(false)} className="text-slate-400 hover:text-slate-600 bg-white shadow-sm p-1.5 rounded-full transition-colors">
                       <X className="w-5 h-5" />
                     </button>
@@ -1787,7 +1816,7 @@ export default function ControleDiariaApp() {
               </div>
 
               <div className="p-6 bg-slate-50 flex justify-center pb-8 border-t border-slate-200">
-                 {userProfile.role === 'admin' && (
+                 {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com') && (
                     <button 
                       onClick={() => {
                         setView('admin');
