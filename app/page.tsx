@@ -27,6 +27,7 @@ import { twMerge } from 'tailwind-merge';
 import { supabase } from '../lib/supabase';
 import { loadMonthlyRecords, loadYearlyRecords, saveDailyRecords, saveProfile, fetchProfile, fetchAllUsers, toggleBlockUser, deleteUserProfile } from '../lib/api';
 import localforage from 'localforage';
+import { fetchGlobalSlides, addGlobalSlide, updateGlobalSlide, deleteGlobalSlide } from '../lib/slidesApi';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,6 +69,7 @@ export default function ControleDiariaApp() {
   });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [adminSearchQuery, setAdminSearchQuery] = useState('');
+  const [selectedAdminUser, setSelectedAdminUser] = useState<any | null>(null);
   const [annualNotes, setAnnualNotes] = useState('');
 
   // Slideshow States
@@ -176,8 +178,7 @@ export default function ControleDiariaApp() {
   // Load slides when user changes
   useEffect(() => {
     if (authUserId) {
-      import('../lib/slidesApi').then(({ fetchGlobalSlides }) => {
-        fetchGlobalSlides().then((dbSlides) => {
+      fetchGlobalSlides().then((dbSlides) => {
           if (dbSlides && dbSlides.length > 0) {
             setSlides(dbSlides);
           } else {
@@ -205,7 +206,6 @@ export default function ControleDiariaApp() {
             }
           });
         });
-      });
     }
   }, [authUserId]);
 
@@ -227,13 +227,11 @@ export default function ControleDiariaApp() {
     try {
       if (newSlideData.id) {
         // Update existing
-        const { updateGlobalSlide } = await import('../lib/slidesApi');
         const savedDbSlide = await updateGlobalSlide(newSlideData.id, newSlideData);
         const updatedSlides = slides.map(s => s.id === newSlideData.id ? savedDbSlide : s);
         setSlides(updatedSlides);
       } else {
         // Create new
-        const { addGlobalSlide } = await import('../lib/slidesApi');
         const savedDbSlide = await addGlobalSlide(newSlideData);
         const updatedSlides = [...slides, savedDbSlide];
         setSlides(updatedSlides);
@@ -278,7 +276,6 @@ export default function ControleDiariaApp() {
 
   const handleDeleteSlide = async (id: string) => {
     try {
-      const { deleteGlobalSlide } = await import('../lib/slidesApi');
       await deleteGlobalSlide(id);
       const updatedSlides = slides.filter(s => s.id !== id);
       setSlides(updatedSlides);
@@ -300,14 +297,28 @@ export default function ControleDiariaApp() {
   };
 
   const toggleBlock = async (id: string, isBlocked: boolean) => {
-    await toggleBlockUser(id, !isBlocked);
-    setAllUsers(prev => prev.map(u => u.id === id ? { ...u, is_blocked: !isBlocked } : u));
+    try {
+      await toggleBlockUser(id, !isBlocked);
+      setAllUsers(prev => prev.map(u => u.id === id ? { ...u, is_blocked: !isBlocked } : u));
+    } catch (error) {
+      console.error('Failed to toggle block:', error);
+      alert('Erro ao atualizar status do usuário. Verifique se o banco de dados está configurado.');
+      // Optional: still update local state for preview purposes if no DB
+      setAllUsers(prev => prev.map(u => u.id === id ? { ...u, is_blocked: !isBlocked } : u));
+    }
   };
 
   const deleteUser = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este usuário e todos os seus registros?')) {
-      await deleteUserProfile(id);
-      setAllUsers(prev => prev.filter(u => u.id !== id));
+      try {
+        await deleteUserProfile(id);
+        setAllUsers(prev => prev.filter(u => u.id !== id));
+      } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('Erro ao excluir usuário. Verifique se o banco de dados está configurado.');
+        // Optional: update local state for preview
+        setAllUsers(prev => prev.filter(u => u.id !== id));
+      }
     }
   };
 
@@ -796,7 +807,7 @@ export default function ControleDiariaApp() {
                   ) : (
                     <User className="w-12 h-12 text-slate-400" />
                   )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 transition-opacity">
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <Camera className="w-8 h-8 text-white" />
                   </div>
                 </div>
@@ -1265,7 +1276,7 @@ export default function ControleDiariaApp() {
                 <h2 className="text-3xl font-extrabold text-[#1a2332] tracking-tight mb-1">Slideshow</h2>
                 <p className="text-slate-500 font-medium">Exibição de notas e imagens</p>
               </div>
-              {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com' || authUserId) && (
+              {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com') && (
                 <button
                   onClick={() => setShowSlideConfig(true)}
                   className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-medium py-2 px-4 rounded-xl flex items-center gap-2 transition-colors"
@@ -1331,7 +1342,7 @@ export default function ControleDiariaApp() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.3, delay: 0.1 }}
-                      className="absolute inset-0 flex items-center justify-center p-8 text-center z-10"
+                      className="absolute inset-0 flex items-center justify-center p-8 text-center"
                       style={{ backgroundColor: slides[currentSlideIndex].type === 'text' ? (slides[currentSlideIndex].bgColor || '#6366f1') : 'transparent' }}
                     >
                       <div 
@@ -1352,8 +1363,8 @@ export default function ControleDiariaApp() {
                 </AnimatePresence>
                 
                 {/* Controls Overlay */}
-                <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/60 to-transparent flex flex-col gap-4 opacity-100 transition-opacity z-30 pointer-events-none">
-                  <div className="flex justify-center gap-2 pointer-events-auto">
+                <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/60 to-transparent flex flex-col gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-center gap-2">
                     {slides.map((_, i) => (
                       <div 
                         key={i} 
@@ -1365,7 +1376,7 @@ export default function ControleDiariaApp() {
                       />
                     ))}
                   </div>
-                  <div className="flex items-center justify-between pointer-events-auto">
+                  <div className="flex items-center justify-between">
                     {(userProfile.role === 'admin' || userProfile.email === 'renatof.rcc@gmail.com') ? (
                       <div className="flex gap-2">
                         <button 
@@ -1717,28 +1728,14 @@ export default function ControleDiariaApp() {
                             {u.is_blocked ? 'Bloqueado' : 'Ativo'}
                           </span>
                         </td>
-                        <td className="p-4 text-center space-x-2">
-                           {userProfile.email !== u.email && (
-                             <div className="flex items-center justify-center gap-2">
-                              <button 
-                                onClick={() => toggleBlock(u.id, u.is_blocked)} 
-                                className={cn(
-                                  "w-9 h-9 rounded-xl flex items-center justify-center transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500",
-                                  u.is_blocked ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200" : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
-                                )}
-                                title={u.is_blocked ? 'Desbloquear Acesso' : 'Bloquear Acesso'}
-                              >
-                                {u.is_blocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                              </button>
-                              <button 
-                                onClick={() => deleteUser(u.id)}
-                                className="w-9 h-9 bg-white border border-red-200 text-red-600 rounded-xl flex items-center justify-center hover:bg-red-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
-                                title="Excluir Definitivamente"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                             </div>
-                           )}
+                        <td className="p-4 text-center">
+                           <button
+                             onClick={() => setSelectedAdminUser(u)}
+                             className="w-9 h-9 bg-white border border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center hover:bg-indigo-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 mx-auto"
+                             title="Abrir Informações"
+                           >
+                             <Eye className="w-4 h-4" />
+                           </button>
                         </td>
                       </tr>
                     ))}
@@ -1746,7 +1743,98 @@ export default function ControleDiariaApp() {
                 </table>
               </div>
             </div>
-            
+
+            {/* Modal for User Details */}
+            <AnimatePresence>
+              {selectedAdminUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="bg-white rounded-3xl shadow-2xl p-6 lg:p-8 w-full max-w-lg relative border border-slate-200"
+                  >
+                    <button
+                      onClick={() => setSelectedAdminUser(null)}
+                      className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    
+                    <div className="flex flex-col items-center mb-6">
+                       <div className="w-20 h-20 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-3xl mb-4 border-2 border-indigo-200">
+                         {selectedAdminUser.photo_url ? (
+                            <img src={selectedAdminUser.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                         ) : (
+                            `${(selectedAdminUser.name?.[0] || selectedAdminUser.email[0]).toUpperCase()}`
+                         )}
+                       </div>
+                       <h3 className="text-2xl font-bold text-slate-800">{selectedAdminUser.name || 'Sem nome'} {selectedAdminUser.last_name || ''}</h3>
+                       <p className="text-slate-500">{selectedAdminUser.email}</p>
+                       <div className="flex gap-2 mt-2">
+                         <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md">{selectedAdminUser.phone || 'Sem telefone'}</span>
+                         {selectedAdminUser.role === 'admin' && (
+                           <span className="text-xs bg-slate-800 text-white px-2 py-1 rounded-md font-bold uppercase tracking-wider">Admin</span>
+                         )}
+                       </div>
+                    </div>
+
+                    <div className="space-y-4 mb-8">
+                       <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between border border-slate-100">
+                         <span className="text-sm font-medium text-slate-600">Status da Conta</span>
+                         <span className={cn(
+                           "text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider",
+                           selectedAdminUser.is_blocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+                         )}>
+                           {selectedAdminUser.is_blocked ? 'Bloqueado' : 'Ativo'}
+                         </span>
+                       </div>
+                       <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between border border-slate-100">
+                         <span className="text-sm font-medium text-slate-600">Cadastrado em</span>
+                         <span className="text-sm font-semibold text-slate-800">
+                           {selectedAdminUser.created_at ? format(new Date(selectedAdminUser.created_at), 'dd/MM/yyyy') : 'N/A'}
+                         </span>
+                       </div>
+                    </div>
+
+                    {userProfile.email !== selectedAdminUser.email ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          onClick={() => {
+                            toggleBlock(selectedAdminUser.id, selectedAdminUser.is_blocked);
+                            setSelectedAdminUser({ ...selectedAdminUser, is_blocked: !selectedAdminUser.is_blocked });
+                          }}
+                          className={cn(
+                            "py-3 rounded-xl font-bold transition-colors border flex items-center justify-center gap-2",
+                            selectedAdminUser.is_blocked 
+                              ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-emerald-200" 
+                              : "bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200"
+                          )}
+                        >
+                          {selectedAdminUser.is_blocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                          {selectedAdminUser.is_blocked ? 'Desbloquear' : 'Bloquear'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteUser(selectedAdminUser.id);
+                            setSelectedAdminUser(null);
+                          }}
+                          className="py-3 bg-white border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Excluir Conta
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center text-sm text-slate-500 bg-slate-50 p-4 rounded-xl">
+                        Você não pode alterar o status da sua própria conta.
+                      </div>
+                    )}
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
             <div className="mt-8 flex justify-center pb-8 shrink-0">
                <button 
                  onClick={() => setView('calendar')} 
