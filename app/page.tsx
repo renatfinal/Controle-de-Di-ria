@@ -69,6 +69,7 @@ export default function ControleDiariaApp() {
   });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [adminSearchQuery, setAdminSearchQuery] = useState('');
+  const [adminFilter, setAdminFilter] = useState<'all' | 'active' | 'blocked'>('all');
   const [selectedAdminUser, setSelectedAdminUser] = useState<any | null>(null);
   const [annualNotes, setAnnualNotes] = useState('');
 
@@ -1642,7 +1643,13 @@ export default function ControleDiariaApp() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <button 
+                onClick={() => setAdminFilter('all')}
+                className={cn(
+                  "bg-white p-6 rounded-3xl border shadow-sm flex items-center justify-between text-left transition-all",
+                  adminFilter === 'all' ? "border-indigo-500 ring-2 ring-indigo-500/20" : "border-slate-200 hover:border-indigo-300"
+                )}
+              >
                  <div>
                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Total de Clientes</p>
                    <p className="text-3xl font-bold text-slate-800">{allUsers.length}</p>
@@ -1650,8 +1657,14 @@ export default function ControleDiariaApp() {
                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
                    <Users className="w-6 h-6" />
                  </div>
-              </div>
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+              </button>
+              <button 
+                onClick={() => setAdminFilter('active')}
+                className={cn(
+                  "bg-white p-6 rounded-3xl border shadow-sm flex items-center justify-between text-left transition-all",
+                  adminFilter === 'active' ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-slate-200 hover:border-emerald-300"
+                )}
+              >
                  <div>
                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Ativos</p>
                    <p className="text-3xl font-bold text-emerald-600">{allUsers.filter(u => !u.is_blocked).length}</p>
@@ -1659,8 +1672,14 @@ export default function ControleDiariaApp() {
                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
                    <Shield className="w-6 h-6" />
                  </div>
-              </div>
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+              </button>
+              <button 
+                onClick={() => setAdminFilter('blocked')}
+                className={cn(
+                  "bg-white p-6 rounded-3xl border shadow-sm flex items-center justify-between text-left transition-all",
+                  adminFilter === 'blocked' ? "border-red-500 ring-2 ring-red-500/20" : "border-slate-200 hover:border-red-300"
+                )}
+              >
                  <div>
                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Bloqueados</p>
                    <p className="text-3xl font-bold text-red-600">{allUsers.filter(u => u.is_blocked).length}</p>
@@ -1668,7 +1687,7 @@ export default function ControleDiariaApp() {
                  <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600">
                    <Lock className="w-6 h-6" />
                  </div>
-              </div>
+              </button>
             </div>
 
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1691,6 +1710,11 @@ export default function ControleDiariaApp() {
                       </tr>
                     )}
                     {allUsers
+                      .filter(u => {
+                        if (adminFilter === 'active' && u.is_blocked) return false;
+                        if (adminFilter === 'blocked' && !u.is_blocked) return false;
+                        return true;
+                      })
                       .filter(u => 
                          (u.name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
                          (u.last_name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
