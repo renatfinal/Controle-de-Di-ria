@@ -69,7 +69,7 @@ export default function ControleDiariaApp() {
   });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [adminSearchQuery, setAdminSearchQuery] = useState('');
-  const [adminFilter, setAdminFilter] = useState<'all' | 'active' | 'blocked'>('all');
+  const [adminFilter, setAdminFilter] = useState<'all' | 'active' | 'blocked' | null>(null);
   const [selectedAdminUser, setSelectedAdminUser] = useState<any | null>(null);
   const [annualNotes, setAnnualNotes] = useState('');
 
@@ -1628,18 +1628,6 @@ export default function ControleDiariaApp() {
                 <h2 className="text-3xl font-bold text-slate-800 mb-1">Painel Administrativo</h2>
                 <p className="text-slate-500">Gestão ativa dos clientes e usuários do sistema.</p>
               </div>
-              <div className="relative max-w-sm w-full md:w-auto">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Buscar por nome ou email..."
-                  value={adminSearchQuery}
-                  onChange={(e) => setAdminSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
-                />
-              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -1690,83 +1678,118 @@ export default function ControleDiariaApp() {
               </button>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[700px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-sm">
-                      <th className="p-4 pl-6 uppercase tracking-wider text-xs">Cliente</th>
-                      <th className="p-4 uppercase tracking-wider text-xs">Contato</th>
-                      <th className="p-4 uppercase tracking-wider text-xs w-32 text-center">Status</th>
-                      <th className="p-4 uppercase tracking-wider text-xs w-40 text-center">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="p-8 text-center text-slate-500">
-                          Nenhum usuário encontrado ou carregando...
-                        </td>
-                      </tr>
-                    )}
-                    {allUsers
-                      .filter(u => {
-                        if (adminFilter === 'active' && u.is_blocked) return false;
-                        if (adminFilter === 'blocked' && !u.is_blocked) return false;
-                        return true;
-                      })
-                      .filter(u => 
-                         (u.name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
-                         (u.last_name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
-                         (u.email?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase())
-                      )
-                      .map((u) => (
-                      <tr key={u.id} className="border-b border-slate-100/50 hover:bg-slate-50/50 transition-colors">
-                        <td className="p-4 pl-6">
-                           <div className="flex items-center gap-3">
-                             <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0 border border-indigo-200">
-                               {u.photo_url ? (
-                                  <img src={u.photo_url} alt="" className="w-10 h-10 rounded-full object-cover" />
-                               ) : (
-                                  `${(u.name?.[0] || u.email[0]).toUpperCase()}`
-                               )}
-                             </div>
-                             <div>
-                               <div className="font-bold text-slate-800 flex items-center gap-2">
-                                 {u.name || 'Sem nome'} {u.last_name || ''}
-                                 {u.role === 'admin' && <span className="text-[10px] bg-slate-800 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Admin</span>}
-                               </div>
-                               <div className="text-xs text-slate-400 mt-0.5">Cadastrado em {u.created_at ? format(new Date(u.created_at), 'dd/MM/yyyy') : 'N/A'}</div>
-                             </div>
+            <AnimatePresence>
+              {adminFilter && (
+                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="bg-white rounded-3xl shadow-2xl flex flex-col w-full max-w-5xl h-[85vh] relative border border-slate-200 overflow-hidden"
+                  >
+                     <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50 shrink-0 gap-4">
+                       <h2 className="text-2xl font-bold text-slate-800">
+                         {adminFilter === 'all' ? 'Todos os Clientes' : adminFilter === 'active' ? 'Clientes Ativos' : 'Clientes Bloqueados'}
+                       </h2>
+                       
+                       <div className="flex items-center gap-4">
+                         <div className="relative max-w-sm w-full">
+                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                             <Search className="h-5 w-5 text-slate-400" />
                            </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="text-slate-700 font-medium">{u.email}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{u.phone || 'Sem telefone'}</div>
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={cn(
-                            "text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider",
-                            u.is_blocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
-                          )}>
-                            {u.is_blocked ? 'Bloqueado' : 'Ativo'}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
-                           <button
-                             onClick={() => setSelectedAdminUser(u)}
-                             className="w-9 h-9 bg-white border border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center hover:bg-indigo-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 mx-auto"
-                             title="Abrir Informações"
-                           >
-                             <Eye className="w-4 h-4" />
-                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                           <input
+                             type="text"
+                             placeholder="Buscar por nome ou email..."
+                             value={adminSearchQuery}
+                             onChange={(e) => setAdminSearchQuery(e.target.value)}
+                             className="pl-10 pr-4 py-2 w-full border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
+                           />
+                         </div>
+                         <button onClick={() => setAdminFilter(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
+                           <X className="w-6 h-6" />
+                         </button>
+                       </div>
+                     </div>
+                     
+                     <div className="flex-1 overflow-y-auto">
+                        <table className="w-full text-left border-collapse min-w-[700px]">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold text-sm">
+                              <th className="p-4 pl-6 uppercase tracking-wider text-xs sticky top-0 bg-slate-50 shadow-[0_1px_0_0_#e2e8f0]">Cliente</th>
+                              <th className="p-4 uppercase tracking-wider text-xs sticky top-0 bg-slate-50 shadow-[0_1px_0_0_#e2e8f0]">Contato</th>
+                              <th className="p-4 uppercase tracking-wider text-xs w-32 text-center sticky top-0 bg-slate-50 shadow-[0_1px_0_0_#e2e8f0]">Status</th>
+                              <th className="p-4 uppercase tracking-wider text-xs w-40 text-center sticky top-0 bg-slate-50 shadow-[0_1px_0_0_#e2e8f0]">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allUsers.length === 0 && (
+                              <tr>
+                                <td colSpan={4} className="p-8 text-center text-slate-500">
+                                  Nenhum usuário encontrado ou carregando...
+                                </td>
+                              </tr>
+                            )}
+                            {allUsers
+                              .filter(u => {
+                                if (adminFilter === 'active' && u.is_blocked) return false;
+                                if (adminFilter === 'blocked' && !u.is_blocked) return false;
+                                return true;
+                              })
+                              .filter(u => 
+                                 (u.name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
+                                 (u.last_name?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) || 
+                                 (u.email?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase())
+                              )
+                              .map((u) => (
+                              <tr key={u.id} className="border-b border-slate-100/50 hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4 pl-6">
+                                   <div className="flex items-center gap-3">
+                                     <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0 border border-indigo-200">
+                                       {u.photo_url ? (
+                                          <img src={u.photo_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                                       ) : (
+                                          `${(u.name?.[0] || u.email[0]).toUpperCase()}`
+                                       )}
+                                     </div>
+                                     <div>
+                                       <div className="font-bold text-slate-800 flex items-center gap-2">
+                                         {u.name || 'Sem nome'} {u.last_name || ''}
+                                         {u.role === 'admin' && <span className="text-[10px] bg-slate-800 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Admin</span>}
+                                       </div>
+                                       <div className="text-xs text-slate-400 mt-0.5">Cadastrado em {u.created_at ? format(new Date(u.created_at), 'dd/MM/yyyy') : 'N/A'}</div>
+                                     </div>
+                                   </div>
+                                </td>
+                                <td className="p-4">
+                                  <div className="text-slate-700 font-medium">{u.email}</div>
+                                  <div className="text-xs text-slate-500 mt-0.5">{u.phone || 'Sem telefone'}</div>
+                                </td>
+                                <td className="p-4 text-center">
+                                  <span className={cn(
+                                    "text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider",
+                                    u.is_blocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+                                  )}>
+                                    {u.is_blocked ? 'Bloqueado' : 'Ativo'}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-center">
+                                   <button
+                                     onClick={() => setSelectedAdminUser(u)}
+                                     className="w-9 h-9 bg-white border border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center hover:bg-indigo-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 mx-auto"
+                                     title="Abrir Informações"
+                                   >
+                                     <Eye className="w-4 h-4" />
+                                   </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                     </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
 
             {/* Modal for User Details */}
             <AnimatePresence>
